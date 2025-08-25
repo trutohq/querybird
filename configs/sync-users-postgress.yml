@@ -3,7 +3,7 @@ name: Sync Users Postgress
 description: Export user data from PostgreSQL
 input:
   postgres:
-    connection_info: "!secrets sync-users-postgress.database.docker"
+    connection_info: '!secrets sync-users-postgress.database.docker'
     sql:
       - name: users
         sql: |-
@@ -53,10 +53,10 @@ outputs:
     endpoint: https://app.balkan.id/api/rest/v0/entitlements/upload-url
     method: POST
     headers:
-      X-Api-Key-ID: "!secrets sync-users-postgress.api_keys.balkan_key_id"
-      X-Api-Key-Secret: "!secrets sync-users-postgress.api_keys.balkan_key_secret"
+      X-Api-Key-ID: '!secrets sync-users-postgress.api_keys.balkan_key_id'
+      X-Api-Key-Secret: '!secrets sync-users-postgress.api_keys.balkan_key_secret'
     body:
-      integrationId: "!secrets sync-users-postgress.api_keys.balkan_integration_id"
+      integrationId: '!secrets sync-users-postgress.api_keys.balkan_integration_id'
     response_url_field: url
     upload_method: PUT
     format: csv

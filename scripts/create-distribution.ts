@@ -1,8 +1,11 @@
 #!/usr/bin/env bun
 import { mkdir, readdir, stat, access } from 'fs/promises';
 import { join, basename } from 'path';
+import { readFileSync } from 'fs';
 
-const RAW_VERSION = process.env.VERSION || '2.0.0';
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+const RAW_VERSION = process.env.VERSION || packageJson.version;
 const VERSION = RAW_VERSION.replace(/^v/i, '');
 const BINARIES_DIR = join(process.cwd(), 'dist', 'binaries');
 const RELEASES_DIR = join(process.cwd(), 'dist', 'releases');

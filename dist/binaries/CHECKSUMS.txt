@@ -1,10 +1,11 @@
 # QueryBird Binary Checksums
-# Version: 2.0.0
-# Generated: 2025-08-25T13:03:29.096Z
+# Version: 1.1.0
+# Generated: 2025-08-25T13:49:53.275Z
 
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-linux-x64
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-linux-arm64
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-windows-arm64.exe
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-darwin-arm64
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-windows-x64.exe
-debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-darwin-x64
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-linux-x64
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-linux-arm64
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-windows-arm64.exe
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-darwin-arm64
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-windows-x64.exe
+5542346ce30f48fecfd3327b4ea545176b33e0222de3a77fb6869912ad97d0eb  querybird-public.pem
+2746824e9f7c5458fc0bca4f1dd25ce622b96bf25b0256a0763ac722b4dd0723  querybird-darwin-x64

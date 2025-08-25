@@ -1,7 +1,11 @@
 import { readFile, writeFile, chmod, rename } from 'fs/promises';
 import { join, dirname } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { Logger } from './logger';
+
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+const currentVersion = process.env.VERSION || packageJson.version;
 
 interface ReleaseInfo {
   tag_name: string;
@@ -258,7 +262,6 @@ export async function handleUpdateCommand(args: string[]): Promise<void> {
   const { platform, arch } = AutoUpdater.detectPlatform();
   
   // Get current version and binary path
-  const currentVersion = process.env.VERSION || '2.0.0';
   const binaryPath = process.argv[0]; // Path to current executable
   
   const updater = new AutoUpdater({

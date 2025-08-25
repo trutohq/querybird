@@ -7,9 +7,17 @@ import { handleUpdateCommand } from './utils/updater';
 import { PostgresSetup } from './utils/postgres-setup';
 import { mkdir, access } from 'fs/promises';
 import { join } from 'path';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = join(__filename, '..');
+
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const VERSION = packageJson.version;
 
 const program = new Command();
-const VERSION = '2.0.0';
 
 program.name('querybird').description('QueryBird - Single Instance Job Scheduler').version(VERSION);
 

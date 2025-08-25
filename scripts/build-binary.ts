@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 import { build } from 'bun';
 import { mkdir, writeFile, chmod, access, copyFile, unlink } from 'fs/promises';
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 
 interface BuildTarget {
@@ -11,7 +13,9 @@ interface BuildTarget {
   binaryName: string;
 }
 
-const RAW_VERSION = process.env.VERSION || '2.0.0';
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+const RAW_VERSION = process.env.VERSION || packageJson.version;
 const VERSION = RAW_VERSION.replace(/^v/i, '');
 const BUILD_DIR = './dist/binaries';
 
