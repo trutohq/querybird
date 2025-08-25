@@ -1,0 +1,29 @@
+[Unit]
+Description=QueryBird Job Scheduler
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=querybird
+Group=querybird
+WorkingDirectory=/opt/querybird
+ExecStart=/usr/local/bin/querybird start --config-dir /opt/querybird/configs --log-level info
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/querybird
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

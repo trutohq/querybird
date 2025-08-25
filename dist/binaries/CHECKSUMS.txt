@@ -1,0 +1,10 @@
+# QueryBird Binary Checksums
+# Version: 2.0.0
+# Generated: 2025-08-25T11:59:47.779Z
+
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-linux-x64
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-linux-arm64
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-windows-arm64.exe
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-darwin-arm64
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-windows-x64.exe
+b5a29fccd651a3bf02f9b4f3c4ef2d028e36acf48943e7db53bb8ce5b0dc2e97  querybird-darwin-x64
