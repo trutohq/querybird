@@ -1,11 +1,10 @@
 import { readFile, writeFile, chmod, rename } from 'fs/promises';
 import { join, dirname } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { Logger } from './logger';
 
-// Read version from package.json
-const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
-const currentVersion = process.env.VERSION || packageJson.version;
+// Read version from environment variable or fallback
+const currentVersion = process.env.VERSION || '2.0.5';
 
 interface ReleaseInfo {
   tag_name: string;
