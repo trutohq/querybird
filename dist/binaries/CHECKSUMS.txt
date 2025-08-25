@@ -1,6 +1,6 @@
 # QueryBird Binary Checksums
 # Version: 2.0.0
-# Generated: 2025-08-25T12:07:21.248Z
+# Generated: 2025-08-25T13:03:29.096Z
 
 debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-linux-x64
 debf94bb98ff537dcfe949c89240267eb4e4cd9423a9c35b341d8cbe211ea33e  querybird-linux-arm64

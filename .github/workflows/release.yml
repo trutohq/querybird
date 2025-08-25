@@ -16,6 +16,8 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -83,6 +85,7 @@ jobs:
           body: ${{ github.event.release.body }}
           draft: false
           prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             dist/releases/*.zip
             dist/releases/querybird-v*-checksums.txt
@@ -110,6 +113,7 @@ jobs:
             Choose the appropriate binary for your platform and follow the installation instructions.
           draft: false
           prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             dist/releases/*.zip
             dist/releases/querybird-v*-checksums.txt
