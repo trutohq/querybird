@@ -1,6 +1,6 @@
 {
   "name": "@your-org/querybird",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "QueryBird - Single Instance Job Scheduler with Dynamic Config Monitoring",
   "main": "dist/main-runner.js",
   "type": "module",
