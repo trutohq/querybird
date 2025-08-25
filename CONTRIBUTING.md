@@ -126,6 +126,7 @@ type(scope): description
 ```
 
 Examples:
+
 - `feat(core): add support for MySQL connections`
 - `fix(utils): resolve memory leak in logger`
 - `docs(readme): update installation instructions`
