@@ -11,7 +11,8 @@ interface BuildTarget {
   binaryName: string;
 }
 
-const VERSION = process.env.VERSION || '2.0.0';
+const RAW_VERSION = process.env.VERSION || '2.0.0';
+const VERSION = RAW_VERSION.replace(/^v/i, '');
 const BUILD_DIR = './dist/binaries';
 
 const targets: BuildTarget[] = [

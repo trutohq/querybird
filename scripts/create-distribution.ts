@@ -2,12 +2,14 @@
 import { mkdir, readdir, stat, access } from 'fs/promises';
 import { join, basename } from 'path';
 
-const VERSION = process.env.VERSION || '2.0.0';
+const RAW_VERSION = process.env.VERSION || '2.0.0';
+const VERSION = RAW_VERSION.replace(/^v/i, '');
 const BINARIES_DIR = join(process.cwd(), 'dist', 'binaries');
 const RELEASES_DIR = join(process.cwd(), 'dist', 'releases');
 
 interface PlatformArchive {
   name: string;
+  binaryFile: string;
   files: string[];
   archiveType: 'tar.gz' | 'zip';
 }
@@ -15,32 +17,38 @@ interface PlatformArchive {
 const platforms: PlatformArchive[] = [
   {
     name: 'querybird-linux-x64',
-    files: ['querybird-linux-x64', 'install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    binaryFile: 'querybird-linux-x64',
+    files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
     archiveType: 'zip',
   },
   {
     name: 'querybird-linux-arm64',
-    files: ['querybird-linux-arm64', 'install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    binaryFile: 'querybird-linux-arm64',
+    files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
     archiveType: 'zip',
   },
   {
-    name: 'querybird-darwin-x64',
-    files: ['querybird-darwin-x64', 'install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    name: 'querybird-macos-intel',
+    binaryFile: 'querybird-darwin-x64',
+    files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
     archiveType: 'zip',
   },
   {
-    name: 'querybird-darwin-arm64',
-    files: ['querybird-darwin-arm64', 'install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    name: 'querybird-macos-apple-silicon',
+    binaryFile: 'querybird-darwin-arm64',
+    files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
     archiveType: 'zip',
   },
   {
     name: 'querybird-windows-x64',
-    files: ['querybird-windows-x64.exe', 'install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
+    binaryFile: 'querybird-windows-x64.exe',
+    files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
     archiveType: 'zip',
   },
   {
     name: 'querybird-windows-arm64',
-    files: ['querybird-windows-arm64.exe', 'install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
+    binaryFile: 'querybird-windows-arm64.exe',
+    files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
     archiveType: 'zip',
   },
 ];
@@ -73,13 +81,9 @@ async function createZip(platform: PlatformArchive): Promise<void> {
     const cwd = process.cwd();
     process.chdir(BINARIES_DIR);
 
-    // Dynamically include optional files if they exist (.sig and public key)
-    const baseFiles = [...platform.files];
-
-    const binaryFile = platform.files.find((f) => f.startsWith(platform.name));
-    if (binaryFile) {
-      baseFiles.push(`${binaryFile}.sig`);
-    }
+    // Include binary, signature (if exists), public key, and additional files
+    const baseFiles = [platform.binaryFile, ...platform.files];
+    baseFiles.push(`${platform.binaryFile}.sig`);
     baseFiles.push('querybird-public.pem');
 
     // Filter to only existing files

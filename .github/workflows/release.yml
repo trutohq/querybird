@@ -60,7 +60,8 @@ jobs:
           echo "Ref name: ${{ github.ref_name }}"
 
           # Set version in package.json
-          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          sed -i "s/\"version\": \".*\"/\"version\": \"$CLEAN_VERSION\"/" package.json
 
           # Build all binaries
           bun run build:binaries
@@ -77,7 +78,8 @@ jobs:
         env:
           VERSION: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.version }}
         run: |
-          bun run scripts/create-distribution.ts
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          VERSION=$CLEAN_VERSION bun run scripts/create-distribution.ts
 
       - name: Create or update release
         if: github.event_name == 'release'
