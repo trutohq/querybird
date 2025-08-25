@@ -3,6 +3,9 @@ name: Release Binaries
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -44,23 +47,78 @@ jobs:
 
       - name: Build binaries for all platforms
         env:
-          VERSION: ${{ github.event.release.tag_name || github.event.inputs.version }}
+          VERSION: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.version }}
         run: |
+          echo "Building for version: $VERSION"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          
           # Set version in package.json
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
 
           # Build all binaries
           bun run build:binaries
+          
+          # List what was built
+          echo "Built files:"
+          ls -la dist/binaries/
 
       - name: Sign binaries
         if: env.SIGNING_PRIVATE_KEY != ''
         run: |
           bun run scripts/sign-binaries.ts sign-all
 
-      - name: Upload binaries to release
+      - name: Create or update release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.name }}
+          body: ${{ github.event.release.body }}
+          draft: false
+          prerelease: false
+          files: |
+            # Individual platform binaries
+            dist/binaries/querybird-linux-x64
+            dist/binaries/querybird-linux-arm64
+            dist/binaries/querybird-darwin-x64
+            dist/binaries/querybird-darwin-arm64
+            dist/binaries/querybird-windows-x64.exe
+            dist/binaries/querybird-windows-arm64.exe
+            # Installation and setup scripts
+            dist/binaries/install.sh
+            dist/binaries/install.ps1
+            dist/binaries/setup-postgres.sh
+            dist/binaries/setup-postgres.bat
+            dist/binaries/services/*
+            # Checksums and keys
+            dist/binaries/CHECKSUMS.txt
+            keys/querybird-public.pem
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release from tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            ## QueryBird ${{ github.ref_name }}
+            
+            This release was automatically created from tag ${{ github.ref_name }}.
+            
+            ### What's Included
+            - Cross-platform binaries for Linux, macOS, and Windows
+            - Installation scripts for all platforms
+            - Setup utilities for PostgreSQL
+            - SHA256 checksums for verification
+            
+            ### Downloads
+            Choose the appropriate binary for your platform and follow the installation instructions.
+          draft: false
+          prerelease: false
           files: |
             # Individual platform binaries
             dist/binaries/querybird-linux-x64
