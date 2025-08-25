@@ -27,20 +27,14 @@ process.env.VERSION = VERSION;
 program
   .command('start')
   .option('--config-dir <path>', 'Config directory path', './configs')
-  .option('--secrets-dir <path>', 'Secrets directory path', './secrets')  
+  .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .option('--max-concurrent <num>', 'Max concurrent jobs', '10')
   .option('--log-level <level>', 'Log level (debug, info, warn, error)', 'info')
   .description('Start the job scheduler and watch configs')
-  .action(async (opts: {
-    configDir: string;
-    secretsDir: string;
-    encryptionKey?: string;
-    maxConcurrent: string;
-    logLevel: LogLevelName;
-  }) => {
+  .action(async (opts: { configDir: string; secretsDir: string; encryptionKey?: string; maxConcurrent: string; logLevel: LogLevelName }) => {
     const logger = new Logger(opts.logLevel);
-    
+
     try {
       // Ensure directories exist
       await mkdir(opts.configDir, { recursive: true });
@@ -57,12 +51,12 @@ program
       });
 
       await runner.start();
-      
+
       logger.info('QueryBird started successfully');
       logger.info(`Config directory: ${opts.configDir}`);
       logger.info(`Secrets directory: ${opts.secretsDir}`);
       logger.info(`Max concurrent jobs: ${opts.maxConcurrent}`);
-      
+
       const gracefulShutdown = async (): Promise<void> => {
         logger.info('Shutting down gracefully...');
         await runner.stop();
@@ -78,7 +72,6 @@ program
       });
 
       process.stdin.resume();
-      
     } catch (error) {
       logger.error('Failed to start QueryBird:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
@@ -92,25 +85,20 @@ program
   .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .description('Execute a single job once and exit')
-  .action(async (opts: {
-    jobId: string;
-    configDir: string;
-    secretsDir: string;
-    encryptionKey?: string;
-  }) => {
+  .action(async (opts: { jobId: string; configDir: string; secretsDir: string; encryptionKey?: string }) => {
     const logger = new Logger();
-    
+
     try {
       const runner = new JobRunner({
         configDir: opts.configDir,
         secretsFile: join(opts.secretsDir, 'secrets.json'),
         logger,
-        encryptionPassword: opts.encryptionKey
+        encryptionPassword: opts.encryptionKey,
       });
 
       await runner.start();
       const execution = await runner.executeJobOnce(opts.jobId);
-      
+
       if (execution) {
         if (execution.status === 'completed') {
           logger.info(`Job ${opts.jobId} completed successfully`);
@@ -123,9 +111,8 @@ program
           process.exit(1);
         }
       }
-      
+
       await runner.stop();
-      
     } catch (error) {
       logger.error('Failed to execute job:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
@@ -148,23 +135,15 @@ program
   .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .description('Interactive setup for PostgreSQL data extraction job')
-  .action(async (opts: {
-    configDir: string;
-    secretsDir: string;
-    encryptionKey?: string;
-  }) => {
+  .action(async (opts: { configDir: string; secretsDir: string; encryptionKey?: string }) => {
     const logger = new Logger();
-    
+
     try {
       // Ensure directories exist
       await mkdir(opts.configDir, { recursive: true });
       await mkdir(opts.secretsDir, { recursive: true });
 
-      const setup = new PostgresSetup(
-        join(opts.secretsDir, 'secrets.json'),
-        opts.encryptionKey,
-        logger
-      );
+      const setup = new PostgresSetup(join(opts.secretsDir, 'secrets.json'), opts.encryptionKey, logger);
 
       await setup.initializePostgres(opts.configDir, opts.secretsDir);
     } catch (error) {
@@ -199,19 +178,13 @@ secretsCommand
   .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Store a secret at the specified path')
-  .action(async (opts: {
-    path: string;
-    value: string;
-    secretsFile: string;
-    encryptionKey?: string;
-  }) => {
+  .action(async (opts: { path: string; value: string; secretsFile: string; encryptionKey?: string }) => {
     const logger = new Logger();
-    
+
     try {
       const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
       await secretsManager.setSecret(opts.path, opts.value);
       logger.info(`✓ Secret stored: ${opts.path}`);
-      
     } catch (error) {
       logger.error('Failed to store secret:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
@@ -224,24 +197,19 @@ secretsCommand
   .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Retrieve a secret value')
-  .action(async (opts: {
-    path: string;
-    secretsFile: string;
-    encryptionKey?: string;
-  }) => {
+  .action(async (opts: { path: string; secretsFile: string; encryptionKey?: string }) => {
     const logger = new Logger();
-    
+
     try {
       const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
       const value = await secretsManager.getSecret(opts.path);
-      
+
       if (value === undefined) {
         logger.error(`Secret not found: ${opts.path}`);
         process.exit(1);
       }
-      
+
       console.log(JSON.stringify(value, null, 2));
-      
     } catch (error) {
       logger.error('Failed to retrieve secret:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
@@ -255,11 +223,11 @@ secretsCommand
   .description('List all available secret paths')
   .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
     const logger = new Logger();
-    
+
     try {
       const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
       const secrets = await secretsManager.listSecrets();
-      
+
       if (secrets.length === 0) {
         logger.info('No secrets configured');
       } else {
@@ -268,7 +236,6 @@ secretsCommand
           console.log(`  ${index + 1}. ${secret}`);
         });
       }
-      
     } catch (error) {
       logger.error('Failed to list secrets:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
