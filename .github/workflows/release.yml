@@ -34,21 +34,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Setup signing keys
-        env:
-          SIGNING_PRIVATE_KEY: ${{ secrets.SIGNING_PRIVATE_KEY }}
-          SIGNING_PUBLIC_KEY: ${{ secrets.SIGNING_PUBLIC_KEY }}
+      - name: Generate signing keys
         run: |
           mkdir -p keys
-          if [ -n "$SIGNING_PRIVATE_KEY" ]; then
-            echo "$SIGNING_PRIVATE_KEY" > keys/querybird-private.pem
-            echo "$SIGNING_PUBLIC_KEY" > keys/querybird-public.pem
-            chmod 600 keys/querybird-private.pem
-            echo "Using provided signing keys"
-          else
-            echo "No signing keys provided, generating new ones"
-            bun run scripts/sign-binaries.ts generate-keys
-          fi
+          echo "Generating new signing keys for this release"
+          bun run scripts/sign-binaries.ts generate-keys
 
       - name: Build binaries for all platforms
         env:
