@@ -28,13 +28,13 @@ const platforms: PlatformArchive[] = [
     archiveType: 'zip',
   },
   {
-    name: 'querybird-macos-intel',
+    name: 'querybird-darwin-x64',
     binaryFile: 'querybird-darwin-x64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
     archiveType: 'zip',
   },
   {
-    name: 'querybird-macos-apple-silicon',
+    name: 'querybird-darwin-arm64',
     binaryFile: 'querybird-darwin-arm64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
     archiveType: 'zip',
