@@ -45,7 +45,6 @@ input:
               'staging' AS environment
             FROM orders
             WHERE created_at >= CURRENT_DATE - INTERVAL '30 days';
-
 transform: |-
   {
     "summary": {

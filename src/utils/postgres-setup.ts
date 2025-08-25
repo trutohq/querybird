@@ -201,8 +201,6 @@ export class PostgresSetup {
             name: 'users',
             sql: `SELECT 
             rolname AS username,
-            '${db.name}' AS db_name,
-            'default' AS region,
             rolsuper AS is_superuser,
             rolcreaterole AS can_create_role,
             rolcreatedb AS can_create_db,
@@ -224,8 +222,6 @@ export class PostgresSetup {
             name: 'users',
             sql: `SELECT 
             rolname AS username,
-            '${db.name}' AS db_name,
-            'default' AS region,
             rolsuper AS is_superuser,
             rolcreaterole AS can_create_role,
             rolcreatedb AS can_create_db,
@@ -247,10 +243,10 @@ export class PostgresSetup {
         (db) =>
           `${db.name}.users.{
     "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & db_name & "::" & region,
+    "Entity Name": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
     "Entity Type": "identity",
     "Entity Source Type": "user",
-    "Entity Source ID": username & "::" & db_name & "::" & region,
+    "Entity Source ID": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
     "Entity Username": username,
     "Entity Email": username,
     "Entity - Has Access To Name": is_superuser ? "Admin" : "User",
@@ -273,10 +269,10 @@ export class PostgresSetup {
       // Single database transform
       transform = `users.{
     "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & db_name & "::" & region,
+    "Entity Name": username & "::" & connection_info.db_name & "::" & connection_info.region,
     "Entity Type": "identity",
     "Entity Source Type": "user", 
-    "Entity Source ID": username & "::" & db_name & "::" & region,
+    "Entity Source ID": username & "::" & connection_info.db_name & "::" & connection_info.region,
     "Entity Username": username,
     "Entity Email": username,
     "Entity - Has Access To Name": is_superuser ? "Admin" : "User",

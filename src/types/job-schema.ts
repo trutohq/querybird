@@ -105,6 +105,12 @@ export const JobSchema = z.object({
    * - wsrwr.users.is_superuser - Access is_superuser field from wsrwr database users query
    * - $merge([test1.users, wsrwr.users]) - Merge results from multiple databases
    *
+   * Connection Info Context:
+   * - Single connection: connection_info.db_name, connection_info.region
+   * - Multiple connections: db_name.connection_info.db_name, db_name.connection_info.region
+   * - Root level: connections_info.db_name for all connection details
+   * - Additional fields: connection_info.host, connection_info.port, connection_info.user, connection_info.ssl
+   *
    * Note: The new format creates nested objects, so you can access data using
    * standard dot notation in JSONata expressions.
    */

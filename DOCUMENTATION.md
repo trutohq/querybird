@@ -54,6 +54,58 @@ transform: |-
 - Aggregate: `$count(production.customers)`
 - Merge: `$merge([production.customers, staging.customers])`
 
+### Connection Info Context
+
+The `connection_info` object is automatically available in the jsonata transform context, providing access to database connection details:
+
+#### Single Database Connection
+
+```jsonata
+{
+  "db_name": connection_info.db_name,
+  "region": connection_info.region,
+  "host": connection_info.host,
+  "port": connection_info.port,
+  "user": connection_info.user,
+  "ssl": connection_info.ssl
+}
+```
+
+#### Multiple Database Connections
+
+For multiple connections, each database has its own `connection_info` context:
+
+```jsonata
+{
+  "test1_db": test1.connection_info.db_name,
+  "test1_region": test1.connection_info.region,
+  "wsrwr_db": wsrwr.connection_info.db_name,
+  "wsrwr_region": wsrwr.connection_info.region
+}
+```
+
+You can also access all connection info at the root level:
+
+```jsonata
+{
+  "test1_info": connections_info.test1,
+  "wsrwr_info": connections_info.wsrwr
+}
+```
+
+This allows you to dynamically reference connection properties in your transforms instead of hardcoding values:
+
+```yaml
+transform: |-
+  users.{
+    "Entity Name": username & "::" & connection_info.db_name & "::" & connection_info.region,
+    "Database": connection_info.db_name,
+    "Region": connection_info.region
+  }
+```
+
+The `connection_info` is parsed from your database connection configuration and supports both JSON and URL formats.
+
 ## Installation (Developers)
 
 ### From Source

@@ -181,9 +181,18 @@ export class JobRunner {
 
     // Handle array of connections
     if (Array.isArray(config)) {
+      // Add a connections_info object at the root level for easy access
+      results.connections_info = {};
+
       for (const dbConfig of config) {
         const connectionInfo = await this.secretsManager.resolveSecret(dbConfig.connection_info);
         const connection = await this.dbManager.getConnection(type, connectionInfo);
+
+        // Parse connection info to extract db_name and region
+        const connectionDetails = this.parseConnectionInfo(connectionInfo);
+
+        // Store connection info at root level for easy access
+        (results.connections_info as Record<string, unknown>)[dbConfig.name] = connectionDetails;
 
         for (const query of dbConfig.sql) {
           // Create nested object structure for better JSONata integration
@@ -196,19 +205,66 @@ export class JobRunner {
           // Store data in nested structure: results[db_name][query_name]
           (results[dbConfig.name] as Record<string, unknown>)[query.name] = data;
         }
+
+        // Also add connection_info to the individual database context for backward compatibility
+        if (!results[dbConfig.name]) {
+          results[dbConfig.name] = {};
+        }
+        (results[dbConfig.name] as Record<string, unknown>).connection_info = connectionDetails;
       }
     } else {
       // Handle single connection (backward compatibility)
       const connectionInfo = await this.secretsManager.resolveSecret(config.connection_info);
       const connection = await this.dbManager.getConnection(type, connectionInfo);
 
+      // Parse connection info to extract db_name and region
+      const connectionDetails = this.parseConnectionInfo(connectionInfo);
+
       for (const query of config.sql) {
         const data = await connection.query(query.sql);
         results[query.name] = data;
       }
+
+      // Add connection_info to the context
+      results.connection_info = connectionDetails;
     }
 
     return results;
+  }
+
+  private parseConnectionInfo(connectionInfo: string): Record<string, unknown> {
+    try {
+      // Try to parse as JSON first
+      const config = JSON.parse(connectionInfo);
+      return {
+        db_name: config.database || 'unknown',
+        region: config.region || 'default',
+        host: config.host,
+        port: config.port,
+        user: config.user || config.username,
+        ssl: config.ssl,
+      };
+    } catch (error) {
+      // If not JSON, try to parse as URL
+      try {
+        const urlObj = new URL(connectionInfo);
+        return {
+          db_name: urlObj.pathname.slice(1) || 'unknown',
+          region: urlObj.searchParams.get('region') || 'default',
+          host: urlObj.hostname,
+          port: urlObj.port ? parseInt(urlObj.port, 10) : undefined,
+          user: urlObj.username,
+          ssl: urlObj.searchParams.get('ssl') !== 'false',
+        };
+      } catch (urlError) {
+        // If neither JSON nor URL, return basic info
+        return {
+          db_name: 'unknown',
+          region: 'default',
+          connection_string: connectionInfo,
+        };
+      }
+    }
   }
 
   private async executeHttpRequest(config: { url: string; method: 'GET' | 'POST'; headers?: string | Record<string, string> }): Promise<unknown> {
