@@ -11,7 +11,7 @@ on:
         default: '2.0.0'
 
 jobs:
-  build-and-sign:
+  build-and-upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,7 @@ jobs:
       - name: Setup signing keys
         env:
           SIGNING_PRIVATE_KEY: ${{ secrets.SIGNING_PRIVATE_KEY }}
-          SIGNING_PUBLIC_KEY: ${{ secrets.SIGNING_PRIVATE_KEY }}
+          SIGNING_PUBLIC_KEY: ${{ secrets.SIGNING_PUBLIC_KEY }}
         run: |
           mkdir -p keys
           if [ -n "$SIGNING_PRIVATE_KEY" ]; then
@@ -56,12 +56,6 @@ jobs:
         if: env.SIGNING_PRIVATE_KEY != ''
         run: |
           bun run scripts/sign-binaries.ts sign-all
-
-      - name: Create distribution packages
-        env:
-          VERSION: ${{ github.event.release.tag_name || github.event.inputs.version }}
-        run: |
-          bun run scripts/create-distribution.ts
 
       - name: Upload binaries to release
         if: github.event_name == 'release'
@@ -96,44 +90,3 @@ jobs:
             dist/releases/
             dist/binaries/
             keys/querybird-public.pem
-
-  test-installation:
-    needs: build-and-sign
-    if: github.event_name == 'workflow_dispatch'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: querybird-release-v${{ github.event.inputs.version }}
-
-      - name: Test installation script (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          chmod +x install.sh
-          chmod +x setup-postgres.sh
-          ./install.sh --help
-          ./setup-postgres.sh --help || echo "Setup script help not available"
-
-      - name: Test installation script (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          Get-Content install.ps1 | Select-String "param" | Out-Null
-          Get-Content setup-postgres.bat | Select-String "echo" | Out-Null
-
-      - name: Test binary
-        run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            chmod +x querybird-linux-x64
-            ./querybird-linux-x64 --help
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            chmod +x querybird-darwin-arm64
-            ./querybird-darwin-arm64 --help
-          else
-            ./querybird-windows-x64.exe --help
-          fi
-        shell: bash
