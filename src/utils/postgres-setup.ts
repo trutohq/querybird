@@ -321,7 +321,7 @@ export class PostgresSetup {
     // Load existing secrets first
     let existingSecrets: SecretsConfig;
     try {
-      existingSecrets = await this.secretsManager.getSecrets();
+      existingSecrets = await this.secretsManager.loadSecrets();
     } catch {
       // If no existing secrets file, start with empty structure
       existingSecrets = {
