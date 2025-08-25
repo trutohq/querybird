@@ -75,12 +75,6 @@ jobs:
             dist/binaries/querybird-darwin-arm64
             dist/binaries/querybird-windows-x64.exe
             dist/binaries/querybird-windows-arm64.exe
-            # Distribution packages
-            dist/releases/querybird-*-v${{ github.event.release.tag_name }}.tar.gz
-            dist/releases/querybird-*-v${{ github.event.release.tag_name }}.zip
-            dist/releases/querybird-v${{ github.event.release.tag_name }}-universal.tar.gz
-            dist/releases/querybird-v${{ github.event.release.tag_name }}-checksums.txt
-            dist/releases/querybird-v${{ github.event.release.tag_name }}-release-notes.md
             # Installation and setup scripts
             dist/binaries/install.sh
             dist/binaries/install.ps1
