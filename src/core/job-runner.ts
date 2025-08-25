@@ -176,7 +176,7 @@ export class JobRunner {
     return results;
   }
 
-  private async executeDbQuery(type: 'postgres' | 'mysql', config: { connection_info: string; sql: Array<{ name: string; sql: string }> } | Array<{ name: string; connection_info: string; sql: Array<{ name: string; sql: string }> }>): Promise<Record<string, unknown>> {
+  private async executeDbQuery(type: 'postgres' | 'mysql', config: { name: string; connection_info: string; sql: Array<{ name: string; sql: string }> } | Array<{ name: string; connection_info: string; sql: Array<{ name: string; sql: string }> }>): Promise<Record<string, unknown>> {
     const results: Record<string, unknown> = {};
 
     // Handle array of connections
@@ -233,32 +233,20 @@ export class JobRunner {
       // Parse connection info to extract db_name and region
       const connectionDetails = this.parseConnectionInfo(connectionInfo);
 
-      // If config has a name field (new schema), use nested structure
-      if (config.name) {
-        // Add connections_info at root level for consistency
-        results.connections_info = {};
-        (results.connections_info as Record<string, unknown>)[config.name] = connectionDetails;
+      // Add connections_info at root level for consistency
+      results.connections_info = {};
+      (results.connections_info as Record<string, unknown>)[config.name] = connectionDetails;
 
-        // Create nested structure: results[db_name][query_name]
-        results[config.name] = {};
-        
-        for (const query of config.sql) {
-          const data = await connection.query(query.sql);
-          (results[config.name] as Record<string, unknown>)[query.name] = data;
-        }
-        
-        // Add connection_info to the individual database context
-        (results[config.name] as Record<string, unknown>).connection_info = connectionDetails;
-      } else {
-        // Legacy format without name field
-        for (const query of config.sql) {
-          const data = await connection.query(query.sql);
-          results[query.name] = data;
-        }
-        
-        // Add connection_info to the root context
-        results.connection_info = connectionDetails;
+      // Create nested structure: results[db_name][query_name]
+      results[config.name] = {};
+      
+      for (const query of config.sql) {
+        const data = await connection.query(query.sql);
+        (results[config.name] as Record<string, unknown>)[query.name] = data;
       }
+      
+      // Add connection_info to the individual database context
+      (results[config.name] as Record<string, unknown>).connection_info = connectionDetails;
     }
 
     return results;
