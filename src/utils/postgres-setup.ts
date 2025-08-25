@@ -247,10 +247,10 @@ export class PostgresSetup {
         (db) =>
           `${db.name}.users.{
     "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
+    "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
     "Entity Type": "identity",
     "Entity Source Type": "user",
-    "Entity Source ID": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
+    "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
     "Entity Username": username,
     "Entity Email": username,
     "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
