@@ -1,0 +1,103 @@
+id: sync
+name: sync
+description: Export user data from PostgreSQL
+input:
+  postgres:
+    - name: docker
+      connection_info: "!secrets sync.database.docker"
+      sql:
+        - name: users
+          sql: |-
+            SELECT 
+                        rolname AS username,
+                        rolsuper AS is_superuser,
+                        rolcreaterole AS can_create_role,
+                        rolcreatedb AS can_create_db,
+                        rolcanlogin AS can_login,
+                        CURRENT_TIMESTAMP AS last_login_time,
+                        CURRENT_TIMESTAMP AS last_password_changed_time
+                      FROM pg_roles
+                      WHERE rolcanlogin = true;
+    - name: docker_2
+      connection_info: "!secrets sync.database.docker_2"
+      sql:
+        - name: users
+          sql: |-
+            SELECT 
+                        rolname AS username,
+                        rolsuper AS is_superuser,
+                        rolcreaterole AS can_create_role,
+                        rolcreatedb AS can_create_db,
+                        rolcanlogin AS can_login,
+                        CURRENT_TIMESTAMP AS last_login_time,
+                        CURRENT_TIMESTAMP AS last_password_changed_time
+                      FROM pg_roles
+                      WHERE rolcanlogin = true;
+transform: |-
+  $merge([
+    docker.users.{
+      "Project": "sync",
+      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Type": "identity",
+      "Entity Source Type": "user",
+      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Username": username,
+      "Entity Email": username,
+      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Entity Type": "connection",
+      "Entity - Has Access To Source Type": "role",
+      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
+      "Entity - Has Access To Permission Value": "true",
+      "Entity Status": can_login ? "active" : "inactive",
+      "Entity First Name": $substringBefore(username, "."),
+      "Entity Last Name": $substringAfter(username, "."),
+      "Entity LastLoginTime": last_login_time,
+      "Entity LastPasswordChangedTime": last_password_changed_time,
+      "Entity MfaEnabled": "false"
+    },
+    docker_2.users.{
+      "Project": "sync",
+      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Type": "identity",
+      "Entity Source Type": "user",
+      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Username": username,
+      "Entity Email": username,
+      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Entity Type": "connection",
+      "Entity - Has Access To Source Type": "role",
+      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
+      "Entity - Has Access To Permission Value": "true",
+      "Entity Status": can_login ? "active" : "inactive",
+      "Entity First Name": $substringBefore(username, "."),
+      "Entity Last Name": $substringAfter(username, "."),
+      "Entity LastLoginTime": last_login_time,
+      "Entity LastPasswordChangedTime": last_password_changed_time,
+      "Entity MfaEnabled": "false"
+    }
+  ])
+schedule: "* * * * *"
+enabled: true
+outputs:
+  - type: webhook
+    endpoint: https://webhook.site/6fd9f34e-0fed-452c-ab13-482dd18044f9
+    method: POST
+    headers:
+      Content-Type: application/json
+      X-QueryBird-Job: sync
+    retryCount: 2
+  - type: http
+    endpoint: https://app.balkan.id/api/rest/v0/entitlements/upload-url
+    method: POST
+    headers:
+      X-Api-Key-ID: "!secrets sync.api_keys.balkan_key_id"
+      X-Api-Key-Secret: "!secrets sync.api_keys.balkan_key_secret"
+    body:
+      integrationId: "!secrets sync.api_keys.balkan_integration_id"
+    response_url_field: url
+    upload_method: PUT
+    format: csv
+    retryCount: 3
+timeout: 30000

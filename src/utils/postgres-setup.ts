@@ -11,6 +11,7 @@ interface DatabaseConfig {
   database: string;
   user: string;
   password: string;
+  region: string;
   ssl: boolean;
 }
 
@@ -120,6 +121,7 @@ export class PostgresSetup {
       const database = await this.promptForInput('Database name', 'string', true);
       const user = await this.promptForInput('Username', 'string', true);
       const password = await this.promptForInput('Password', 'password', true);
+      const region = await this.promptForInput('Region (optional)', 'string', false, 'default');
       const sslStr = await this.promptForInput('Enable SSL? (y/n)', 'boolean', false, 'y');
       const ssl = sslStr.toLowerCase().startsWith('y');
 
@@ -130,6 +132,7 @@ export class PostgresSetup {
         database,
         user,
         password,
+        region,
         ssl,
       });
 
@@ -213,9 +216,10 @@ export class PostgresSetup {
         ],
       }));
     } else {
-      // Single database connection
+      // Single database connection - now also requires name field
       const db = databases[0];
       input.postgres = {
+        name: db.name,
         connection_info: `!secrets ${jobConfig.id}.database.${db.name}`,
         sql: [
           {
@@ -249,8 +253,8 @@ export class PostgresSetup {
     "Entity Source ID": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
     "Entity Username": username,
     "Entity Email": username,
-    "Entity - Has Access To Name": is_superuser ? "Admin" : "User",
-    "Entity - Has Access To Source ID": is_superuser ? "admin-role-001" : "user-role-001",
+    "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+    "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
     "Entity - Has Access To Entity Type": "connection",
     "Entity - Has Access To Source Type": "role",
     "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
@@ -266,17 +270,18 @@ export class PostgresSetup {
 
       transform = `$merge([\n  ${transformParts.join(',\n  ')}\n])`;
     } else {
-      // Single database transform
-      transform = `users.{
+      // Single database transform - now using named database structure
+      const db = databases[0];
+      transform = `${db.name}.users.{
     "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & connection_info.db_name & "::" & connection_info.region,
+    "Entity Name": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
     "Entity Type": "identity",
     "Entity Source Type": "user", 
-    "Entity Source ID": username & "::" & connection_info.db_name & "::" & connection_info.region,
+    "Entity Source ID": username & "::" & ${db.name}.connection_info.db_name & "::" & ${db.name}.connection_info.region,
     "Entity Username": username,
     "Entity Email": username,
-    "Entity - Has Access To Name": is_superuser ? "Admin" : "User",
-    "Entity - Has Access To Source ID": is_superuser ? "admin-role-001" : "user-role-001",
+    "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+    "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
     "Entity - Has Access To Entity Type": "connection",
     "Entity - Has Access To Source Type": "role",
     "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
@@ -348,6 +353,7 @@ export class PostgresSetup {
         database: db.database,
         user: db.user,
         password: db.password,
+        region: db.region,
         ssl: db.ssl,
         timeout: 30000,
       };

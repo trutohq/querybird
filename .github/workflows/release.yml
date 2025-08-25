@@ -59,6 +59,9 @@ jobs:
           echo "Ref: ${{ github.ref }}"
           echo "Ref name: ${{ github.ref_name }}"
 
+          # Clean any existing builds
+          bun run clean
+
           # Set version in package.json
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/^v//')
           sed -i "s/\"version\": \".*\"/\"version\": \"$CLEAN_VERSION\"/" package.json
@@ -73,6 +76,11 @@ jobs:
       - name: Sign binaries
         run: |
           bun run scripts/sign-binaries.ts sign-all
+
+      - name: Clean existing releases
+        run: |
+          # Clean any existing release assets
+          rm -rf dist/releases/*.zip dist/releases/*.tar.gz dist/releases/*.txt dist/releases/*.md || true
 
       - name: Create distribution archives
         env:

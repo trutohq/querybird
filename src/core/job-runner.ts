@@ -185,48 +185,80 @@ export class JobRunner {
       results.connections_info = {};
 
       for (const dbConfig of config) {
-        const connectionInfo = await this.secretsManager.resolveSecret(dbConfig.connection_info);
-        const connection = await this.dbManager.getConnection(type, connectionInfo);
+        try {
+          this.logger.debug(`Executing queries for database: ${dbConfig.name}`);
+          
+          const connectionInfo = await this.secretsManager.resolveSecret(dbConfig.connection_info);
+          const connection = await this.dbManager.getConnection(type, connectionInfo);
 
-        // Parse connection info to extract db_name and region
-        const connectionDetails = this.parseConnectionInfo(connectionInfo);
+          // Parse connection info to extract db_name and region
+          const connectionDetails = this.parseConnectionInfo(connectionInfo);
 
-        // Store connection info at root level for easy access
-        (results.connections_info as Record<string, unknown>)[dbConfig.name] = connectionDetails;
+          // Store connection info at root level for easy access
+          (results.connections_info as Record<string, unknown>)[dbConfig.name] = connectionDetails;
 
-        for (const query of dbConfig.sql) {
-          // Create nested object structure for better JSONata integration
+          // Initialize database result object
           if (!results[dbConfig.name]) {
             results[dbConfig.name] = {};
           }
 
-          const data = await connection.query(query.sql);
+          for (const query of dbConfig.sql) {
+            this.logger.debug(`Executing query '${query.name}' on database '${dbConfig.name}'`);
+            
+            const data = await connection.query(query.sql);
+            this.logger.debug(`Query '${query.name}' on database '${dbConfig.name}' returned ${Array.isArray(data) ? data.length : 'non-array'} results`);
 
-          // Store data in nested structure: results[db_name][query_name]
-          (results[dbConfig.name] as Record<string, unknown>)[query.name] = data;
-        }
+            // Store data in nested structure: results[db_name][query_name]
+            (results[dbConfig.name] as Record<string, unknown>)[query.name] = data;
+          }
 
-        // Also add connection_info to the individual database context for backward compatibility
-        if (!results[dbConfig.name]) {
-          results[dbConfig.name] = {};
+          // Add connection_info to the individual database context
+          (results[dbConfig.name] as Record<string, unknown>).connection_info = connectionDetails;
+          
+          this.logger.debug(`Successfully completed queries for database: ${dbConfig.name}`);
+        } catch (error) {
+          this.logger.error(`Failed to execute queries for database '${dbConfig.name}':`, { error: error instanceof Error ? error.message : String(error) });
+          // Continue with other databases instead of stopping entirely
+          results[dbConfig.name] = {
+            error: error instanceof Error ? error.message : String(error),
+            connection_info: {}
+          };
         }
-        (results[dbConfig.name] as Record<string, unknown>).connection_info = connectionDetails;
       }
     } else {
-      // Handle single connection (backward compatibility)
+      // Handle single connection - now with required name field
       const connectionInfo = await this.secretsManager.resolveSecret(config.connection_info);
       const connection = await this.dbManager.getConnection(type, connectionInfo);
 
       // Parse connection info to extract db_name and region
       const connectionDetails = this.parseConnectionInfo(connectionInfo);
 
-      for (const query of config.sql) {
-        const data = await connection.query(query.sql);
-        results[query.name] = data;
-      }
+      // If config has a name field (new schema), use nested structure
+      if (config.name) {
+        // Add connections_info at root level for consistency
+        results.connections_info = {};
+        (results.connections_info as Record<string, unknown>)[config.name] = connectionDetails;
 
-      // Add connection_info to the context
-      results.connection_info = connectionDetails;
+        // Create nested structure: results[db_name][query_name]
+        results[config.name] = {};
+        
+        for (const query of config.sql) {
+          const data = await connection.query(query.sql);
+          (results[config.name] as Record<string, unknown>)[query.name] = data;
+        }
+        
+        // Add connection_info to the individual database context
+        (results[config.name] as Record<string, unknown>).connection_info = connectionDetails;
+      } else {
+        // Legacy format without name field
+        for (const query of config.sql) {
+          const data = await connection.query(query.sql);
+          results[query.name] = data;
+        }
+        
+        // Add connection_info to the root context
+        results.connection_info = connectionDetails;
+      }
     }
 
     return results;

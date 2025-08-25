@@ -1,9 +1,10 @@
-id: sync-users-postgress
-name: Sync Users Postgress
+id: ete
+name: erer
 description: Export user data from PostgreSQL
 input:
   postgres:
-    connection_info: '!secrets sync-users-postgress.database.docker'
+    name: er
+    connection_info: "!secrets ete.database.er"
     sql:
       - name: users
         sql: |-
@@ -18,16 +19,16 @@ input:
                     FROM pg_roles
                     WHERE rolcanlogin = true;
 transform: |-
-  users.{
-      "Project": "Sync Users Postgress",
-      "Entity Name": username & "::" & connection_info.db_name & "::" & connection_info.region,
+  er.users.{
+      "Project": "erer",
+      "Entity Name": username & "::" & er.connection_info.db_name & "::" & er.connection_info.region,
       "Entity Type": "identity",
       "Entity Source Type": "user", 
-      "Entity Source ID": username & "::" & connection_info.db_name & "::" & connection_info.region,
+      "Entity Source ID": username & "::" & er.connection_info.db_name & "::" & er.connection_info.region,
       "Entity Username": username,
       "Entity Email": username,
-      "Entity - Has Access To Name": is_superuser ? "Admin" : "User",
-      "Entity - Has Access To Source ID": is_superuser ? "admin-role-001" : "user-role-001",
+      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
       "Entity - Has Access To Entity Type": "connection",
       "Entity - Has Access To Source Type": "role",
       "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
@@ -39,26 +40,7 @@ transform: |-
       "Entity LastPasswordChangedTime": last_password_changed_time,
       "Entity MfaEnabled": "false"
     }
-schedule: 0/1 * * *
+schedule: "* * * * *"
 enabled: true
-outputs:
-  - type: webhook
-    endpoint: https://example.com
-    method: POST
-    headers:
-      Content-Type: application/json
-      X-QueryBird-Job: sync-users-postgress
-    retryCount: 2
-  - type: http
-    endpoint: https://app.balkan.id/api/rest/v0/entitlements/upload-url
-    method: POST
-    headers:
-      X-Api-Key-ID: '!secrets sync-users-postgress.api_keys.balkan_key_id'
-      X-Api-Key-Secret: '!secrets sync-users-postgress.api_keys.balkan_key_secret'
-    body:
-      integrationId: '!secrets sync-users-postgress.api_keys.balkan_integration_id'
-    response_url_field: url
-    upload_method: PUT
-    format: csv
-    retryCount: 3
+outputs: []
 timeout: 30000

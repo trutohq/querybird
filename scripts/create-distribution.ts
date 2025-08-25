@@ -14,7 +14,6 @@ interface PlatformArchive {
   name: string;
   binaryFile: string;
   files: string[];
-  archiveType: 'tar.gz' | 'zip';
 }
 
 const platforms: PlatformArchive[] = [
@@ -22,65 +21,39 @@ const platforms: PlatformArchive[] = [
     name: 'querybird-linux-x64',
     binaryFile: 'querybird-linux-x64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
-    archiveType: 'zip',
   },
   {
     name: 'querybird-linux-arm64',
     binaryFile: 'querybird-linux-arm64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
-    archiveType: 'zip',
   },
   {
     name: 'querybird-darwin-x64',
     binaryFile: 'querybird-darwin-x64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
-    archiveType: 'zip',
   },
   {
     name: 'querybird-darwin-arm64',
     binaryFile: 'querybird-darwin-arm64',
     files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
-    archiveType: 'zip',
   },
   {
     name: 'querybird-windows-x64',
     binaryFile: 'querybird-windows-x64.exe',
     files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
-    archiveType: 'zip',
   },
   {
     name: 'querybird-windows-arm64',
     binaryFile: 'querybird-windows-arm64.exe',
     files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
-    archiveType: 'zip',
   },
 ];
-
-async function createTarGz(platform: PlatformArchive): Promise<void> {
-  const archivePath = join(RELEASES_DIR, `${platform.name}-v${VERSION}.tar.gz`);
-
-  try {
-    const { execSync } = await import('child_process');
-    const cwd = process.cwd();
-    process.chdir(BINARIES_DIR);
-
-    execSync(`tar -czf "${archivePath}" ${platform.files.join(' ')}`, { stdio: 'inherit' });
-
-    process.chdir(cwd);
-    console.log(`✅ Created ${basename(archivePath)}`);
-  } catch (error) {
-    console.error(`❌ Failed to create tar.gz for ${platform.name}:`, error);
-  }
-}
 
 async function createZip(platform: PlatformArchive): Promise<void> {
   const archivePath = join(RELEASES_DIR, `${platform.name}-v${VERSION}.zip`);
 
-  // For simplicity, we'll use a basic zip creation
-  // In production, you might want to use a proper zip library
-  const { execSync } = await import('child_process');
-
   try {
+    const { execSync } = await import('child_process');
     const cwd = process.cwd();
     process.chdir(BINARIES_DIR);
 
@@ -109,8 +82,6 @@ async function createZip(platform: PlatformArchive): Promise<void> {
   }
 }
 
-// Universal archive removed in favor of per-target ZIPs
-
 async function createChecksumsFile(): Promise<void> {
   console.log('🔍 Creating release checksums...');
 
@@ -118,7 +89,7 @@ async function createChecksumsFile(): Promise<void> {
   const { readFile, readdir } = await import('fs/promises');
 
   const releaseFiles = await readdir(RELEASES_DIR);
-  const archiveFiles = releaseFiles.filter((f) => f.endsWith('.tar.gz') || f.endsWith('.zip'));
+  const archiveFiles = releaseFiles.filter((f) => f.endsWith('.zip'));
 
   let checksumsContent = `# QueryBird Release Checksums\n`;
   checksumsContent += `# Version: ${VERSION}\n`;

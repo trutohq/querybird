@@ -5,15 +5,9 @@ const SqlQuerySchema = z.object({
   sql: z.string().min(1),
 });
 
-// New format with required name for array connections
+// Database connection schema - name is now required for all connections
 const DatabaseConnectionSchema = z.object({
   name: z.string().min(1),
-  connection_info: z.string().min(1),
-  sql: z.array(SqlQuerySchema).min(1),
-});
-
-// Legacy format for backward compatibility
-const LegacyDatabaseConnectionSchema = z.object({
   connection_info: z.string().min(1),
   sql: z.array(SqlQuerySchema).min(1),
 });
@@ -28,8 +22,8 @@ const urlOrSecretRef = z.string().refine(
 
 export const InputSchema = z
   .object({
-    postgres: z.union([LegacyDatabaseConnectionSchema, DatabaseConnectionSchema, z.array(DatabaseConnectionSchema).min(1)]).optional(),
-    mysql: z.union([LegacyDatabaseConnectionSchema, DatabaseConnectionSchema, z.array(DatabaseConnectionSchema).min(1)]).optional(),
+    postgres: z.union([DatabaseConnectionSchema, z.array(DatabaseConnectionSchema).min(1)]).optional(),
+    mysql: z.union([DatabaseConnectionSchema, z.array(DatabaseConnectionSchema).min(1)]).optional(),
     http: z
       .object({
         url: urlOrSecretRef,

@@ -16,12 +16,12 @@
     "dev": "bun run src/main-runner.ts start --config-dir ./configs --log-level debug",
     "dev:watch": "bun --hot src/main-runner.ts start --config-dir ./configs --log-level debug",
     "build": "bun build src/main-runner.ts --outdir dist --target bun --minify",
-    "build:production": "bun run scripts/build-binary.ts",
+    "build:production": "bun run clean && bun run scripts/build-binary.ts",
     "build:bundle": "bun build src/main-runner.ts --outfile dist/querybird.js --target bun --minify --sourcemap",
     "build:bin": "echo '#!/usr/bin/env bun' > bin/querybird.js && cat dist/querybird.js >> bin/querybird.js && chmod +x bin/querybird.js",
-    "build:binaries": "bun run scripts/build-binary.ts",
-    "build:signed": "bun run scripts/build-binary.ts && bun run scripts/sign-binaries.ts sign-all",
-    "build:distribution": "bun run scripts/build-binary.ts && bun run scripts/create-distribution.ts",
+    "build:binaries": "bun run clean && bun run scripts/build-binary.ts",
+    "build:signed": "bun run clean && bun run scripts/build-binary.ts && bun run scripts/sign-binaries.ts sign-all",
+    "build:distribution": "bun run clean && bun run scripts/build-binary.ts && bun run scripts/create-distribution.ts",
     "generate-keys": "bun run scripts/sign-binaries.ts generate-keys",
     "verify-binary": "bun run scripts/verify-installation.ts",
     "secrets:wizard": "bun run src/utils/secrets-collector.ts wizard",
@@ -35,7 +35,9 @@
     "test": "bun test src/**/*.test.ts",
     "lint": "bun run --bun tsc --noEmit --project .",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist bin keys"
+    "clean": "rm -rf dist bin keys",
+    "clean:releases": "rm -rf dist/releases/*.zip dist/releases/*.tar.gz dist/releases/*.txt dist/releases/*.md",
+    "clean:assets": "bun run scripts/clean-assets.ts"
   },
   "keywords": [
     "database",

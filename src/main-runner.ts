@@ -84,9 +84,10 @@ program
   .option('--config-dir <path>', 'Config directory path', './configs')
   .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
+  .option('--log-level <level>', 'Log level (debug, info, warn, error)', 'info')
   .description('Execute a single job once and exit')
-  .action(async (opts: { jobId: string; configDir: string; secretsDir: string; encryptionKey?: string }) => {
-    const logger = new Logger();
+  .action(async (opts: { jobId: string; configDir: string; secretsDir: string; encryptionKey?: string; logLevel: LogLevelName }) => {
+    const logger = new Logger(opts.logLevel);
 
     try {
       const runner = new JobRunner({
