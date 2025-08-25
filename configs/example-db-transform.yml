@@ -1,0 +1,83 @@
+id: example-db-transform
+name: Example Database Transform
+description: Example showing the new db_name.sql_name format for JSONata transformations
+input:
+  postgres:
+    - name: production
+      connection_info: '!secrets example.database.production'
+      sql:
+        - name: customers
+          sql: |-
+            SELECT 
+              id,
+              name,
+              email,
+              'production' AS environment
+            FROM customers
+            WHERE active = true;
+        - name: orders
+          sql: |-
+            SELECT 
+              id,
+              customer_id,
+              total_amount,
+              'production' AS environment
+            FROM orders
+            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days';
+    - name: staging
+      connection_info: '!secrets example.database.staging'
+      sql:
+        - name: customers
+          sql: |-
+            SELECT 
+              id,
+              name,
+              email,
+              'staging' AS environment
+            FROM customers
+            WHERE active = true;
+        - name: orders
+          sql: |-
+            SELECT 
+              id,
+              customer_id,
+              total_amount,
+              'staging' AS environment
+            FROM orders
+            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days';
+
+transform: |-
+  {
+    "summary": {
+      "total_customers": $count($merge([production.customers, staging.customers])),
+      "total_orders": $count($merge([production.orders, staging.orders])),
+      "environments": ["production", "staging"]
+    },
+    "production_data": {
+      "customers": production.customers,
+      "orders": production.orders,
+      "customer_count": $count(production.customers),
+      "order_count": $count(production.orders)
+    },
+    "staging_data": {
+      "customers": staging.customers,
+      "orders": staging.orders,
+      "customer_count": $count(staging.customers),
+      "order_count": $count(staging.orders)
+    },
+    "combined_customers": $merge([production.customers, staging.customers]).{
+      "id": id,
+      "name": name,
+      "email": email,
+      "environment": environment,
+      "full_identifier": name & " (" & environment & ")"
+    }
+  }
+
+schedule: 0 0 * * *
+enabled: false
+outputs:
+  - type: file
+    path: ./outputs/example-db-transform.json
+    format: json
+timeout: 30000

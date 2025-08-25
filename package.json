@@ -1,0 +1,79 @@
+{
+  "name": "@your-org/querybird",
+  "version": "2.0.0",
+  "description": "QueryBird - Single Instance Job Scheduler with Dynamic Config Monitoring",
+  "main": "dist/main-runner.js",
+  "type": "module",
+  "bin": {
+    "querybird": "./bin/querybird.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "install/**/*"
+  ],
+  "scripts": {
+    "dev": "bun run src/main-runner.ts start --config-dir ./configs --log-level debug",
+    "dev:watch": "bun --hot src/main-runner.ts start --config-dir ./configs --log-level debug",
+    "build": "bun build src/main-runner.ts --outdir dist --target bun --minify",
+    "build:production": "bun run scripts/build-binary.ts",
+    "build:bundle": "bun build src/main-runner.ts --outfile dist/querybird.js --target bun --minify --sourcemap",
+    "build:bin": "echo '#!/usr/bin/env bun' > bin/querybird.js && cat dist/querybird.js >> bin/querybird.js && chmod +x bin/querybird.js",
+    "build:binaries": "bun run scripts/build-binary.ts",
+    "build:signed": "bun run scripts/build-binary.ts && bun run scripts/sign-binaries.ts sign-all",
+    "build:distribution": "bun run scripts/build-binary.ts && bun run scripts/create-distribution.ts",
+    "generate-keys": "bun run scripts/sign-binaries.ts generate-keys",
+    "verify-binary": "bun run scripts/verify-installation.ts",
+    "secrets:wizard": "bun run src/utils/secrets-collector.ts wizard",
+    "secrets:interactive": "bun run src/utils/secrets-collector.ts interactive",
+    "secrets:database": "bun run src/utils/secrets-collector.ts database",
+    "secrets:api-keys": "bun run src/utils/secrets-collector.ts api-keys",
+    "secrets:webhooks": "bun run src/utils/secrets-collector.ts webhooks",
+    "secrets:list": "bun run src/utils/secrets-collector.ts list",
+    "release": "bun run clean && bun run build:distribution && echo 'Distribution packages ready for release in dist/releases/'",
+    "prepublishOnly": "bun run build:production",
+    "test": "bun test src/**/*.test.ts",
+    "lint": "bun run --bun tsc --noEmit --project .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist bin keys"
+  },
+  "keywords": [
+    "database",
+    "query",
+    "scheduler",
+    "webhook",
+    "postgres",
+    "mysql",
+    "cron",
+    "automation",
+    "job-scheduler",
+    "bun",
+    "typescript",
+    "config-watcher",
+    "secrets-management"
+  ],
+  "author": "QueryBird",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.15.5",
+    "@types/yaml": "^1.9.7",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "croner": "^9.1.0",
+    "jsonata": "^2.0.5",
+    "mysql2": "^3.14.3",
+    "pg": "^8.16.3",
+    "yaml": "^2.8.1",
+    "zod": "^3.22.4"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
