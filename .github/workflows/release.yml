@@ -34,12 +34,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Generate signing keys
-        run: |
-          mkdir -p keys
-          echo "Generating new signing keys for this release"
-          bun run scripts/sign-binaries.ts generate-keys
-
       - name: Build binaries for all platforms
         env:
           VERSION: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.version }}
@@ -58,6 +52,11 @@ jobs:
 
           # Build all binaries
           bun run build:binaries
+
+          # Generate signing keys after build (since build cleans keys directory)
+          mkdir -p keys
+          echo "Generating signing keys after build..."
+          bun run scripts/sign-binaries.ts generate-keys
 
           # List what was built
           echo "Built files:"
