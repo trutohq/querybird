@@ -68,16 +68,27 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            # Individual platform binaries
+            dist/binaries/querybird-linux-x64
+            dist/binaries/querybird-linux-arm64
+            dist/binaries/querybird-darwin-x64
+            dist/binaries/querybird-darwin-arm64
+            dist/binaries/querybird-windows-x64.exe
+            dist/binaries/querybird-windows-arm64.exe
+            # Distribution packages
             dist/releases/querybird-*-v${{ github.event.release.tag_name }}.tar.gz
             dist/releases/querybird-*-v${{ github.event.release.tag_name }}.zip
             dist/releases/querybird-v${{ github.event.release.tag_name }}-universal.tar.gz
             dist/releases/querybird-v${{ github.event.release.tag_name }}-checksums.txt
             dist/releases/querybird-v${{ github.event.release.tag_name }}-release-notes.md
+            # Installation and setup scripts
             dist/binaries/install.sh
             dist/binaries/install.ps1
             dist/binaries/setup-postgres.sh
             dist/binaries/setup-postgres.bat
             dist/binaries/services/*
+            # Checksums and keys
+            dist/binaries/CHECKSUMS.txt
             keys/querybird-public.pem
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
