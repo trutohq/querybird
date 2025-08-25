@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { mkdir, readdir, stat } from 'fs/promises';
+import { mkdir, readdir, stat, access } from 'fs/promises';
 import { join, basename } from 'path';
 
 const VERSION = process.env.VERSION || '2.0.0';
@@ -15,32 +15,32 @@ interface PlatformArchive {
 const platforms: PlatformArchive[] = [
   {
     name: 'querybird-linux-x64',
-    files: ['querybird-linux-x64', 'install.sh', 'setup/setup-postgres.sh'],
-    archiveType: 'tar.gz',
+    files: ['querybird-linux-x64', 'install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    archiveType: 'zip',
   },
   {
     name: 'querybird-linux-arm64',
-    files: ['querybird-linux-arm64', 'install.sh', 'setup/setup-postgres.sh'],
-    archiveType: 'tar.gz',
+    files: ['querybird-linux-arm64', 'install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    archiveType: 'zip',
   },
   {
     name: 'querybird-darwin-x64',
-    files: ['querybird-darwin-x64', 'install.sh', 'setup/setup-postgres.sh'],
-    archiveType: 'tar.gz',
+    files: ['querybird-darwin-x64', 'install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    archiveType: 'zip',
   },
   {
     name: 'querybird-darwin-arm64',
-    files: ['querybird-darwin-arm64', 'install.sh', 'setup/setup-postgres.sh'],
-    archiveType: 'tar.gz',
+    files: ['querybird-darwin-arm64', 'install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    archiveType: 'zip',
   },
   {
     name: 'querybird-windows-x64',
-    files: ['querybird-windows-x64.exe', 'install.ps1', 'setup/setup-postgres.bat'],
+    files: ['querybird-windows-x64.exe', 'install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
     archiveType: 'zip',
   },
   {
     name: 'querybird-windows-arm64',
-    files: ['querybird-windows-arm64.exe', 'install.ps1', 'setup/setup-postgres.bat'],
+    files: ['querybird-windows-arm64.exe', 'install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
     archiveType: 'zip',
   },
 ];
@@ -73,7 +73,27 @@ async function createZip(platform: PlatformArchive): Promise<void> {
     const cwd = process.cwd();
     process.chdir(BINARIES_DIR);
 
-    execSync(`zip -r "${archivePath}" ${platform.files.join(' ')}`, { stdio: 'inherit' });
+    // Dynamically include optional files if they exist (.sig and public key)
+    const baseFiles = [...platform.files];
+
+    const binaryFile = platform.files.find((f) => f.startsWith(platform.name));
+    if (binaryFile) {
+      baseFiles.push(`${binaryFile}.sig`);
+    }
+    baseFiles.push('querybird-public.pem');
+
+    // Filter to only existing files
+    const filesToZip: string[] = [];
+    for (const f of baseFiles) {
+      try {
+        await access(f);
+        filesToZip.push(f);
+      } catch {
+        // ignore missing optional files
+      }
+    }
+
+    execSync(`zip -r "${archivePath}" ${filesToZip.join(' ')}`, { stdio: 'inherit' });
 
     process.chdir(cwd);
     console.log(`✅ Created ${basename(archivePath)}`);
@@ -82,25 +102,7 @@ async function createZip(platform: PlatformArchive): Promise<void> {
   }
 }
 
-async function createUniversalArchive(): Promise<void> {
-  console.log('📦 Creating universal archive...');
-
-  const allFiles = await readdir(BINARIES_DIR);
-  const archivePath = join(RELEASES_DIR, `querybird-v${VERSION}-universal.tar.gz`);
-
-  try {
-    const { execSync } = await import('child_process');
-    const cwd = process.cwd();
-    process.chdir(BINARIES_DIR);
-
-    execSync(`tar -czf "${archivePath}" ${allFiles.join(' ')}`, { stdio: 'inherit' });
-
-    process.chdir(cwd);
-    console.log(`✅ Created universal archive: ${basename(archivePath)}`);
-  } catch (error) {
-    console.error(`❌ Failed to create universal archive:`, error);
-  }
-}
+// Universal archive removed in favor of per-target ZIPs
 
 async function createChecksumsFile(): Promise<void> {
   console.log('🔍 Creating release checksums...');
@@ -237,17 +239,10 @@ async function main(): Promise<void> {
   // Create releases directory
   await mkdir(RELEASES_DIR, { recursive: true });
 
-  // Create platform-specific archives
+  // Create platform-specific ZIP archives (all platforms use ZIP)
   for (const platform of platforms) {
-    if (platform.archiveType === 'tar.gz') {
-      await createTarGz(platform);
-    } else {
-      await createZip(platform);
-    }
+    await createZip(platform);
   }
-
-  // Create universal archive
-  await createUniversalArchive();
 
   // Create checksums and release notes
   await createChecksumsFile();
