@@ -12,8 +12,16 @@ Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ### 🚀 Automatic Installation (Recommended)
 
+**Prerequisites:**
+- **Bun runtime** (JavaScript runtime required)
+
 **macOS and Linux:**
 ```bash
+# Install Bun first (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc  # or restart terminal
+
+# Install QueryBird
 curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
 ```
 
@@ -24,6 +32,7 @@ This script will:
 - Set up configuration directories
 - Create sample configuration files
 - Install system service (LaunchDaemon on macOS, systemd on Linux)
+- **Note:** Bun must be installed separately as shown above
 
 **After installation, complete the setup:**
 
