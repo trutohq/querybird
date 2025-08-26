@@ -1,10 +1,19 @@
 import { readFile, writeFile, chmod, rename } from 'fs/promises';
 import { join, dirname } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { Logger } from './logger';
 
-// Read version from environment variable or fallback
-const currentVersion = process.env.VERSION || '2.0.5';
+// Read version from package.json or environment variable
+let currentVersion = process.env.VERSION;
+if (!currentVersion) {
+  try {
+    const packageJsonPath = join(import.meta.dirname, '..', '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    currentVersion = packageJson.version;
+  } catch {
+    currentVersion = '1.0.0'; // Fallback version
+  }
+}
 
 interface ReleaseInfo {
   tag_name: string;
@@ -264,7 +273,7 @@ export async function handleUpdateCommand(args: string[]): Promise<void> {
   const binaryPath = process.argv[0]; // Path to current executable
 
   const updater = new AutoUpdater({
-    repo: 'your-org/querybird',
+    repo: 'trutohq/querybird',
     currentVersion,
     platform,
     arch,
