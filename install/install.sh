@@ -147,7 +147,7 @@ install_binary() {
     fi
 
     # Install binary
-    if [ -w "${INSTALL_DIR}" ]; then
+    if [ -w "${INSTALL_DIR}" ] || [ "$(id -u)" -eq 0 ]; then
         cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
     else
         sudo cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"

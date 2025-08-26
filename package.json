@@ -1,6 +1,6 @@
 {
   "name": "@trutohq/querybird",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "QueryBird - Single Instance Job Scheduler with Dynamic Config Monitoring",
   "main": "dist/main-runner.js",
   "type": "module",
