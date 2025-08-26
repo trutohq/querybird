@@ -38,7 +38,7 @@ This script will:
 
 1. **Initialize PostgreSQL configuration** (interactive):
    ```bash
-   querybird init-postgres --config-dir ~/.querybird/configs --secrets-dir ~/.querybird/secrets
+   querybird init-postgres
    ```
 
 2. **Start the service**:
@@ -107,7 +107,7 @@ source ~/.bashrc  # or restart terminal
 
 4. **Setup PostgreSQL** (interactive configuration):
    ```bash
-   sudo -u querybird querybird init-postgres --config-dir /opt/querybird/configs --secrets-dir /opt/querybird/secrets
+   sudo -u querybird querybird init-postgres
    ```
 
 5. **Install as systemd service**:
@@ -176,7 +176,7 @@ sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
 
 4. **Setup PostgreSQL** (interactive configuration):
    ```bash
-   querybird init-postgres --config-dir /opt/querybird/configs --secrets-dir /opt/querybird/secrets
+   querybird init-postgres
    ```
 
 5. **Install as LaunchDaemon**:
@@ -256,7 +256,7 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
 
 3. **Setup PostgreSQL** (interactive configuration):
    ```powershell
-   & 'C:\Program Files\QueryBird\querybird.exe' init-postgres --config-dir 'C:\ProgramData\QueryBird\configs' --secrets-dir 'C:\ProgramData\QueryBird\secrets'
+   & 'C:\Program Files\QueryBird\querybird.exe' init-postgres
    ```
 
 4. **Install as Windows service**:
@@ -295,11 +295,8 @@ nssm remove QueryBird confirm
 After installation, initialize PostgreSQL configuration:
 
 ```bash
-# Linux/macOS
-querybird init-postgres --config-dir /opt/querybird/configs --secrets-dir /opt/querybird/secrets
-
-# Windows
-& 'C:\Program Files\QueryBird\querybird.exe' init-postgres --config-dir 'C:\ProgramData\QueryBird\configs' --secrets-dir 'C:\ProgramData\QueryBird\secrets'
+# Linux/macOS/Windows
+querybird init-postgres
 ```
 
 This will interactively set up your database connection and create sample job configurations.
