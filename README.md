@@ -301,6 +301,48 @@ querybird init-postgres
 
 This will interactively set up your database connection and create sample job configurations.
 
+## 📋 Commands
+
+### `querybird start`
+
+Starts the QueryBird job scheduler daemon that monitors configuration files and executes scheduled database queries or HTTP calls.
+
+**Usage:**
+```bash
+querybird start [options]
+```
+
+**Options:**
+- `--encryption-key <key>` - Encryption key for file-based secrets (optional)
+- `--max-concurrent <num>` - Maximum number of concurrent jobs (default: 10)
+- `--log-level <level>` - Log level: debug, info, warn, error (default: info)
+
+**What it does:**
+1. **Configuration Management**: Automatically detects QueryBird paths using `QB_CONFIG_DIR` environment variable or defaults to `~/.querybird/`
+2. **Directory Setup**: Creates necessary directories (configs, secrets, watermarks, outputs) if they don't exist
+3. **Config Watching**: Monitors the configs directory for `.yml`, `.yaml`, and `.json` files containing job definitions
+4. **Job Scheduling**: Uses cron expressions to schedule database queries and HTTP calls
+5. **Concurrent Execution**: Manages multiple jobs simultaneously (configurable limit)
+6. **Graceful Shutdown**: Handles SIGTERM and SIGINT signals for clean shutdown
+
+**Environment Variables:**
+- `QB_CONFIG_DIR` - Base directory for QueryBird files (default: `~/.querybird/`)
+
+**Examples:**
+```bash
+# Start with default settings
+querybird start
+
+# Start with debug logging and custom concurrency
+querybird start --log-level debug --max-concurrent 5
+
+# Start with custom encryption key
+querybird start --encryption-key "your-secret-key"
+
+# Start with custom config directory
+QB_CONFIG_DIR=/opt/querybird querybird start
+```
+
 ## Troubleshooting
 
 ### macOS LaunchDaemon Issues
