@@ -76,7 +76,7 @@ async function checkBinarySignature(binaryPath: string, publicKeyPath: string): 
 
 async function checkConfigurationDirectories(): Promise<VerificationResult[]> {
   const results: VerificationResult[] = [];
-  const configDir = process.env.CONFIG_DIR || join(process.env.HOME || '', '.querybird');
+  const configDir = process.env.QB_CONFIG_DIR || join(process.env.HOME || '', '.querybird');
 
   const directories = [
     { path: join(configDir, 'configs'), name: 'Configs Directory' },
@@ -124,8 +124,9 @@ async function checkConfigurationDirectories(): Promise<VerificationResult[]> {
 }
 
 async function checkPostgresSetup(): Promise<VerificationResult> {
-  const configDir = process.env.CONFIG_DIR || join(process.env.HOME || '', '.querybird/configs');
-  const secretsDir = process.env.SECRETS_DIR || join(process.env.HOME || '', '.querybird/secrets');
+  const paths = { base: process.env.QB_CONFIG_DIR || join(process.env.HOME || '', '.querybird') };
+  const configDir = join(paths.base, 'configs');
+  const secretsDir = join(paths.base, 'secrets');
 
   try {
     // Check if there are any job configs

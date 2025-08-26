@@ -5,6 +5,7 @@ import { ImprovedSecretsManager } from './utils/improved-secrets-manager';
 import { Logger, LogLevelName } from './utils/logger';
 import { handleUpdateCommand } from './utils/updater';
 import { PostgresSetup } from './utils/postgres-setup';
+import { getQueryBirdPaths } from './utils/path-resolver';
 import { mkdir, access } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -34,25 +35,28 @@ process.env.VERSION = VERSION;
 
 program
   .command('start')
-  .option('--config-dir <path>', 'Config directory path', './configs')
-  .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .option('--max-concurrent <num>', 'Max concurrent jobs', '10')
   .option('--log-level <level>', 'Log level (debug, info, warn, error)', 'info')
   .description('Start the job scheduler and watch configs')
-  .action(async (opts: { configDir: string; secretsDir: string; encryptionKey?: string; maxConcurrent: string; logLevel: LogLevelName }) => {
+  .action(async (opts: { encryptionKey?: string; maxConcurrent: string; logLevel: LogLevelName }) => {
     const logger = new Logger(opts.logLevel);
 
     try {
+      // Always use environment-determined paths
+      const paths = getQueryBirdPaths();
+      const configDir = paths.configs;
+      const secretsDir = paths.secrets;
+
       // Ensure directories exist
-      await mkdir(opts.configDir, { recursive: true });
-      await mkdir(opts.secretsDir, { recursive: true });
-      await mkdir('./watermarks', { recursive: true });
-      await mkdir('./outputs', { recursive: true });
+      await mkdir(configDir, { recursive: true });
+      await mkdir(secretsDir, { recursive: true });
+      await mkdir(paths.watermarks, { recursive: true });
+      await mkdir(paths.outputs, { recursive: true });
 
       const runner = new JobRunner({
-        configDir: opts.configDir,
-        secretsFile: join(opts.secretsDir, 'secrets.json'),
+        configDir: configDir,
+        secretsFile: join(secretsDir, 'secrets.json'),
         logger,
         encryptionPassword: opts.encryptionKey,
         maxConcurrentJobs: parseInt(opts.maxConcurrent, 10),
@@ -61,8 +65,8 @@ program
       await runner.start();
 
       logger.info('QueryBird started successfully');
-      logger.info(`Config directory: ${opts.configDir}`);
-      logger.info(`Secrets directory: ${opts.secretsDir}`);
+      logger.info(`Config directory: ${configDir}`);
+      logger.info(`Secrets directory: ${secretsDir}`);
       logger.info(`Max concurrent jobs: ${opts.maxConcurrent}`);
 
       const gracefulShutdown = async (): Promise<void> => {
@@ -89,18 +93,21 @@ program
 program
   .command('run-once')
   .requiredOption('--job-id <id>', 'Job ID to execute')
-  .option('--config-dir <path>', 'Config directory path', './configs')
-  .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .option('--log-level <level>', 'Log level (debug, info, warn, error)', 'info')
   .description('Execute a single job once and exit')
-  .action(async (opts: { jobId: string; configDir: string; secretsDir: string; encryptionKey?: string; logLevel: LogLevelName }) => {
+  .action(async (opts: { jobId: string; encryptionKey?: string; logLevel: LogLevelName }) => {
     const logger = new Logger(opts.logLevel);
 
     try {
+      // Always use environment-determined paths
+      const paths = getQueryBirdPaths();
+      const configDir = paths.configs;
+      const secretsDir = paths.secrets;
+
       const runner = new JobRunner({
-        configDir: opts.configDir,
-        secretsFile: join(opts.secretsDir, 'secrets.json'),
+        configDir: configDir,
+        secretsFile: join(secretsDir, 'secrets.json'),
         logger,
         encryptionPassword: opts.encryptionKey,
       });
@@ -146,22 +153,20 @@ program
     const logger = new Logger();
 
     try {
-      // Use same environment variable logic as installer
-      const baseConfigDir = process.env.CONFIG_DIR || join(process.env.HOME || process.cwd(), '.querybird');
-      const configDir = join(baseConfigDir, 'configs');
-      const secretsDir = join(baseConfigDir, 'secrets');
+      // Use consistent path resolution
+      const paths = getQueryBirdPaths();
 
-      logger.info(`🌍 Using CONFIG_DIR: ${baseConfigDir}`);
-      logger.info(`📁 Config directory: ${configDir}`);
-      logger.info(`🔒 Secrets directory: ${secretsDir}`);
+      logger.info(`🌍 Using CONFIG_DIR: ${paths.base}`);
+      logger.info(`📁 Config directory: ${paths.configs}`);
+      logger.info(`🔒 Secrets directory: ${paths.secrets}`);
 
       // Ensure directories exist
-      await mkdir(configDir, { recursive: true });
-      await mkdir(secretsDir, { recursive: true });
+      await mkdir(paths.configs, { recursive: true });
+      await mkdir(paths.secrets, { recursive: true });
 
-      const setup = new PostgresSetup(join(secretsDir, 'secrets.json'), opts.encryptionKey, logger);
+      const setup = new PostgresSetup(paths.secretsFile, opts.encryptionKey, logger);
 
-      await setup.initializePostgres(configDir, secretsDir);
+      await setup.initializePostgres(paths.configs, paths.secrets);
     } catch (error) {
       logger.error('Setup failed:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
@@ -173,13 +178,13 @@ const secretsCommand = program.command('secrets').description('Manage encrypted 
 
 secretsCommand
   .command('wizard')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Interactive setup wizard for secrets')
-  .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     try {
+      const paths = getQueryBirdPaths();
       const { SecretsCollector } = await import('./utils/secrets-collector');
-      const collector = new SecretsCollector(opts.secretsFile, opts.encryptionKey);
+      const collector = new SecretsCollector(paths.secretsFile, opts.encryptionKey);
       await collector.interactiveSetup();
     } catch (error) {
       console.error('Failed to run secrets wizard:', error instanceof Error ? error.message : String(error));
@@ -191,14 +196,14 @@ secretsCommand
   .command('set')
   .requiredOption('--path <path>', 'Secret path (e.g. database.production, api_keys.stripe)')
   .requiredOption('--value <value>', 'Secret value (JSON string for complex objects)')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Store a secret at the specified path')
-  .action(async (opts: { path: string; value: string; secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { path: string; value: string; encryptionKey?: string }) => {
     const logger = new Logger();
 
     try {
-      const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
+      const paths = getQueryBirdPaths();
+      const secretsManager = new ImprovedSecretsManager(paths.secretsFile, opts.encryptionKey);
       await secretsManager.setSecret(opts.path, opts.value);
       logger.info(`✓ Secret stored: ${opts.path}`);
     } catch (error) {
@@ -210,14 +215,14 @@ secretsCommand
 secretsCommand
   .command('get')
   .requiredOption('--path <path>', 'Secret path to retrieve')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Retrieve a secret value')
-  .action(async (opts: { path: string; secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { path: string; encryptionKey?: string }) => {
     const logger = new Logger();
 
     try {
-      const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
+      const paths = getQueryBirdPaths();
+      const secretsManager = new ImprovedSecretsManager(paths.secretsFile, opts.encryptionKey);
       const value = await secretsManager.getSecret(opts.path);
 
       if (value === undefined) {
@@ -234,14 +239,14 @@ secretsCommand
 
 secretsCommand
   .command('list')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('List all available secret paths')
-  .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     const logger = new Logger();
 
     try {
-      const secretsManager = new ImprovedSecretsManager(opts.secretsFile, opts.encryptionKey);
+      const paths = getQueryBirdPaths();
+      const secretsManager = new ImprovedSecretsManager(paths.secretsFile, opts.encryptionKey);
       const secrets = await secretsManager.listSecrets();
 
       if (secrets.length === 0) {
@@ -260,13 +265,13 @@ secretsCommand
 
 secretsCommand
   .command('database')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Interactive database secrets setup')
-  .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     try {
+      const paths = getQueryBirdPaths();
       const { SecretsCollector } = await import('./utils/secrets-collector');
-      const collector = new SecretsCollector(opts.secretsFile, opts.encryptionKey);
+      const collector = new SecretsCollector(paths.secretsFile, opts.encryptionKey);
       await collector.collectDatabaseSecrets();
     } catch (error) {
       console.error('Failed to setup database secrets:', error instanceof Error ? error.message : String(error));
@@ -276,13 +281,13 @@ secretsCommand
 
 secretsCommand
   .command('api-keys')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Interactive API keys setup')
-  .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     try {
+      const paths = getQueryBirdPaths();
       const { SecretsCollector } = await import('./utils/secrets-collector');
-      const collector = new SecretsCollector(opts.secretsFile, opts.encryptionKey);
+      const collector = new SecretsCollector(paths.secretsFile, opts.encryptionKey);
       await collector.collectApiKeys();
     } catch (error) {
       console.error('Failed to setup API keys:', error instanceof Error ? error.message : String(error));
@@ -292,13 +297,13 @@ secretsCommand
 
 secretsCommand
   .command('webhooks')
-  .option('--secrets-file <file>', 'Secrets file path', './secrets/secrets.json')
   .option('--encryption-key <key>', 'Encryption key for secrets')
   .description('Interactive webhooks setup')
-  .action(async (opts: { secretsFile: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     try {
+      const paths = getQueryBirdPaths();
       const { SecretsCollector } = await import('./utils/secrets-collector');
-      const collector = new SecretsCollector(opts.secretsFile, opts.encryptionKey);
+      const collector = new SecretsCollector(paths.secretsFile, opts.encryptionKey);
       await collector.collectWebhooks();
     } catch (error) {
       console.error('Failed to setup webhooks:', error instanceof Error ? error.message : String(error));

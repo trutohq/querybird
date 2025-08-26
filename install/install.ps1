@@ -270,16 +270,16 @@ function Init-Postgres {
     if (Test-Path $BinaryPath) {
         Write-Log "Running PostgreSQL initialization..." "Green"
         try {
-            & $BinaryPath init-postgres --config-dir "$ConfigDir\configs" --secrets-dir "$ConfigDir\secrets"
+            $env:QB_CONFIG_DIR = $ConfigDir; & $BinaryPath init-postgres
             Write-Log "PostgreSQL initialization completed successfully" "Green"
         } catch {
             Write-Warn "PostgreSQL initialization failed, but you can run it manually later:"
-            Write-Host "  $BinaryPath init-postgres --config-dir $ConfigDir\configs --secrets-dir $ConfigDir\secrets" -ForegroundColor $Colors["Yellow"]
+            Write-Host "  `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryPath init-postgres" -ForegroundColor $Colors["Yellow"]
         }
     } else {
         Write-Warn "QueryBird binary not found, skipping PostgreSQL initialization"
         Write-Host "Run this command after installation:" -ForegroundColor $Colors["Yellow"]
-        Write-Host "  $BinaryPath init-postgres --config-dir $ConfigDir\configs --secrets-dir $ConfigDir\secrets" -ForegroundColor $Colors["Yellow"]
+        Write-Host "  `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryPath init-postgres" -ForegroundColor $Colors["Yellow"]
     }
 }
 
@@ -311,7 +311,8 @@ function Setup-Service {
     # Install service
     try {
         & nssm install $ServiceName $BinaryPath
-        & nssm set $ServiceName AppParameters "start --config-dir $ConfigDir\configs --log-level info"
+        & nssm set $ServiceName AppParameters "start --log-level info"
+        & nssm set $ServiceName AppEnvironmentExtra "QB_CONFIG_DIR=$ConfigDir"
         & nssm set $ServiceName AppDirectory $ConfigDir
         & nssm set $ServiceName Description "QueryBird Job Scheduler"
         & nssm set $ServiceName Start SERVICE_AUTO_START
@@ -331,7 +332,7 @@ function Show-Usage {
     Write-Log "QueryBird installed successfully! 🎉" "Green"
     Write-Host ""
     Write-Host "Usage:" -ForegroundColor $Colors["White"]
-    Write-Host "  $BinaryName start --config-dir $ConfigDir\configs" -ForegroundColor $Colors["White"]
+    Write-Host "  `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryName start" -ForegroundColor $Colors["White"]
     Write-Host "  $BinaryName --help" -ForegroundColor $Colors["White"]
     Write-Host ""
     Write-Host "Configuration:" -ForegroundColor $Colors["White"]
@@ -344,7 +345,7 @@ function Show-Usage {
     $BinaryPath = Join-Path $InstallDir $BinaryName
     if (Test-Path $BinaryPath) {
         Write-Host "PostgreSQL Setup:" -ForegroundColor $Colors["White"]
-        Write-Host "  Run: $BinaryPath init-postgres --config-dir $ConfigDir\configs --secrets-dir $ConfigDir\secrets" -ForegroundColor $Colors["White"]
+        Write-Host "  Run: `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryPath init-postgres" -ForegroundColor $Colors["White"]
         Write-Host ""
     }
     
@@ -355,8 +356,8 @@ function Show-Usage {
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor $Colors["White"]
     Write-Host "  1. Edit $ConfigDir\configs\sample.yml" -ForegroundColor $Colors["White"]
-    Write-Host "  2. Initialize PostgreSQL: $BinaryPath init-postgres --config-dir $ConfigDir\configs --secrets-dir $ConfigDir\secrets" -ForegroundColor $Colors["White"]
-    Write-Host "  3. Start the service: $BinaryPath start --config-dir $ConfigDir\configs" -ForegroundColor $Colors["White"]
+    Write-Host "  2. Initialize PostgreSQL: `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryPath init-postgres" -ForegroundColor $Colors["White"]
+    Write-Host "  3. Start the service: `$env:QB_CONFIG_DIR='$ConfigDir'; $BinaryPath start" -ForegroundColor $Colors["White"]
     Write-Host "     Or as Windows service: nssm start QueryBird" -ForegroundColor $Colors["White"]
     Write-Host ""
     Write-Host "Documentation: https://github.com/$Repo#readme" -ForegroundColor $Colors["White"]

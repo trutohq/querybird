@@ -289,7 +289,7 @@ Type=simple
 User=querybird
 Group=querybird
 WorkingDirectory=${CONFIG_DIR}
-ExecStart=${INSTALL_DIR}/${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs --log-level info
+ExecStart=${INSTALL_DIR}/${BINARY_NAME} start --log-level info
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
@@ -306,6 +306,7 @@ ReadWritePaths=${CONFIG_DIR}
 # Environment
 Environment=NODE_ENV=production
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+Environment=QB_CONFIG_DIR=${CONFIG_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -347,8 +348,6 @@ EOF
     <array>
         <string>${INSTALL_DIR}/${BINARY_NAME}</string>
         <string>start</string>
-        <string>--config-dir</string>
-        <string>${CONFIG_DIR}/configs</string>
         <string>--log-level</string>
         <string>info</string>
     </array>
@@ -368,6 +367,8 @@ EOF
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>${HOME}</string>
+        <key>QB_CONFIG_DIR</key>
+        <string>${CONFIG_DIR}</string>
     </dict>
 </dict>
 </plist>
@@ -405,7 +406,7 @@ show_usage() {
     log "QueryBird installed successfully! 🎉"
     echo ""
     echo "Usage:"
-    echo "  ${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs"
+    echo "  QB_CONFIG_DIR=${CONFIG_DIR} ${BINARY_NAME} start"
     echo "  ${BINARY_NAME} --help"
     echo ""
     echo "Configuration:"
@@ -417,7 +418,7 @@ show_usage() {
     # PostgreSQL initialization status
     if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
         echo "PostgreSQL Setup:"
-        echo "  Run: ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
+        echo "  Run: QB_CONFIG_DIR=${CONFIG_DIR} ${BINARY_NAME} init-postgres"
         echo ""
     fi
     
@@ -437,8 +438,8 @@ show_usage() {
     fi
     echo "Next steps:"
     echo "  1. Edit ${CONFIG_DIR}/configs/sample.yml"
-    echo "  2. Initialize PostgreSQL: ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-    echo "  3. Start the service: ${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs"
+    echo "  2. Initialize PostgreSQL: QB_CONFIG_DIR=${CONFIG_DIR} ${BINARY_NAME} init-postgres"
+    echo "  3. Start the service: QB_CONFIG_DIR=${CONFIG_DIR} ${BINARY_NAME} start"
     if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
         echo "     Or as system service: sudo systemctl start querybird"
     elif [ "$(uname -s)" = "Darwin" ]; then

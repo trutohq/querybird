@@ -1,6 +1,6 @@
 {
   "name": "@trutohq/querybird",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "QueryBird - Single Instance Job Scheduler with Dynamic Config Monitoring",
   "main": "dist/main-runner.js",
   "type": "module",
@@ -13,8 +13,8 @@
     "install/**/*"
   ],
   "scripts": {
-    "dev": "bun run src/main-runner.ts start --config-dir ./configs --log-level debug",
-    "dev:watch": "bun --hot src/main-runner.ts start --config-dir ./configs --log-level debug",
+    "dev": "bun run src/main-runner.ts start --log-level debug",
+    "dev:watch": "bun --hot src/main-runner.ts start --log-level debug",
     "build": "bun build src/main-runner.ts --outdir dist --target bun --minify",
     "build:production": "bun run clean && bun run scripts/build-binary.ts",
     "build:bundle": "bun build src/main-runner.ts --outfile dist/querybird.js --target bun --minify --sourcemap",

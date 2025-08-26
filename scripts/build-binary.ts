@@ -135,7 +135,7 @@ Type=simple
 User=querybird
 Group=querybird
 WorkingDirectory=/opt/querybird
-ExecStart=/usr/local/bin/querybird start --config-dir /opt/querybird/configs --log-level info
+ExecStart=/usr/local/bin/querybird start --log-level info
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
@@ -151,6 +151,7 @@ ReadWritePaths=/opt/querybird
 
 # Environment
 Environment=NODE_ENV=production
+Environment=QB_CONFIG_DIR=/opt/querybird
 
 [Install]
 WantedBy=multi-user.target
@@ -167,8 +168,6 @@ WantedBy=multi-user.target
     <array>
         <string>/usr/local/bin/querybird</string>
         <string>start</string>
-        <string>--config-dir</string>
-        <string>/opt/querybird/configs</string>
         <string>--log-level</string>
         <string>info</string>
     </array>
@@ -186,6 +185,8 @@ WantedBy=multi-user.target
     <dict>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>QB_CONFIG_DIR</key>
+        <string>/opt/querybird</string>
     </dict>
 </dict>
 </plist>
@@ -198,12 +199,13 @@ REM Requires NSSM (Non-Sucking Service Manager)
 
 set SERVICE_NAME=QueryBird
 set BINARY_PATH=C:\\Program Files\\QueryBird\\querybird.exe
-set CONFIG_DIR=C:\\ProgramData\\QueryBird\\configs
+set CONFIG_DIR=C:\\ProgramData\\QueryBird
 
 REM Install service using NSSM
 nssm install %SERVICE_NAME% "%BINARY_PATH%"
-nssm set %SERVICE_NAME% AppParameters "start --config-dir %CONFIG_DIR% --log-level info"
+nssm set %SERVICE_NAME% AppParameters "start --log-level info"
 nssm set %SERVICE_NAME% AppDirectory "C:\\ProgramData\\QueryBird"
+nssm set %SERVICE_NAME% AppEnvironmentExtra "QB_CONFIG_DIR=%CONFIG_DIR%"
 nssm set %SERVICE_NAME% Description "QueryBird Job Scheduler"
 nssm set %SERVICE_NAME% Start SERVICE_AUTO_START
 
@@ -234,22 +236,21 @@ async function createSetupScripts(): Promise<void> {
 set -e
 
 CONFIG_DIR="\${CONFIG_DIR:-/opt/querybird}"
-SECRETS_DIR="\${SECRETS_DIR:-/opt/querybird/secrets}"
 
 echo "🔧 Setting up QueryBird PostgreSQL configuration..."
 
 # Create directories
 mkdir -p "\${CONFIG_DIR}"/{configs,secrets,watermarks,outputs,logs}
-chmod 700 "\${SECRETS_DIR}"
+chmod 700 "\${CONFIG_DIR}/secrets"
 
-# Run init-postgres command using the existing CLI
+# Run init-postgres command using QB_CONFIG_DIR
 echo "📊 Initializing PostgreSQL configuration..."
-querybird init-postgres --config-dir "\${CONFIG_DIR}/configs" --secrets-dir "\${SECRETS_DIR}"
+QB_CONFIG_DIR="\${CONFIG_DIR}" querybird init-postgres
 
 echo "✅ PostgreSQL setup complete!"
 echo "Next steps:"
 echo "1. Edit configuration files in \${CONFIG_DIR}/configs"
-echo "2. Start the service: querybird start --config-dir \${CONFIG_DIR}/configs"
+echo "2. Start the service: QB_CONFIG_DIR=\${CONFIG_DIR} querybird start"
 echo "3. Or install as system service: sudo systemctl enable querybird"
 `;
 
@@ -258,7 +259,6 @@ echo "3. Or install as system service: sudo systemctl enable querybird"
 REM QueryBird Windows Setup Script
 
 set CONFIG_DIR=C:\\ProgramData\\QueryBird
-set SECRETS_DIR=C:\\ProgramData\\QueryBird\\secrets
 
 echo 🔧 Setting up QueryBird configuration...
 
@@ -272,12 +272,13 @@ if not exist "%CONFIG_DIR%\\logs" mkdir "%CONFIG_DIR%\\logs"
 
 REM Run init-postgres command
 echo 📊 Initializing PostgreSQL configuration...
-querybird.exe init-postgres --config-dir "%CONFIG_DIR%\\configs" --secrets-dir "%CONFIG_DIR%\\secrets"
+set QB_CONFIG_DIR=%CONFIG_DIR%
+querybird.exe init-postgres
 
 echo ✅ Setup complete!
 echo Next steps:
 echo 1. Edit configuration files in %CONFIG_DIR%\\configs
-echo 2. Start the service: querybird.exe start --config-dir %CONFIG_DIR%\\configs
+echo 2. Start the service: set QB_CONFIG_DIR=%CONFIG_DIR% && querybird.exe start
 echo 3. Or install as Windows service: install-windows-service.bat
 `;
 
