@@ -191,19 +191,19 @@ sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
 sudo launchctl start dev.querybird
 
 # Stop service  
-sudo launchctl stop dev.querybird
+sudo launchctl bootout system/dev.querybird
 
 # Check if service is loaded
 launchctl print system/dev.querybird
 
 # View standard logs
-cat /opt/querybird/logs/querybird.log
+cat ~/.querybird/logs/querybird.log
 
 # View error logs
-cat /opt/querybird/logs/querybird.error.log
+cat ~/.querybird/logs/querybird.error.log
 
 # Follow error logs in real-time
-tail -f /opt/querybird/logs/querybird.error.log
+tail -f ~/.querybird/logs/querybird.error.log
 
 # Unload service (to disable)
 sudo launchctl bootout system/dev.querybird
