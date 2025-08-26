@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-REPO="your-org/querybird"
+REPO="trutohq/querybird"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 CONFIG_DIR="${HOME}/.querybird"
 BINARY_NAME="querybird"
@@ -415,7 +415,6 @@ main() {
             echo "Options:"
             echo "  -h, --help     Show this help message"
             echo "  --skip-postgres Skip PostgreSQL initialization"
-            echo "  --skip-service  Skip system service setup"
             echo ""
             echo "Environment variables:"
             echo "  INSTALL_DIR    Installation directory (default: /usr/local/bin)"
@@ -426,16 +425,11 @@ main() {
     
     # Parse options
     SKIP_POSTGRES=false
-    SKIP_SERVICE=false
     
     for arg in "$@"; do
         case $arg in
             --skip-postgres)
                 SKIP_POSTGRES=true
-                shift
-                ;;
-            --skip-service)
-                SKIP_SERVICE=true
                 shift
                 ;;
         esac
@@ -458,12 +452,8 @@ main() {
         info "Skipping PostgreSQL initialization (--skip-postgres flag)"
     fi
     
-    # Setup system service (unless skipped)
-    if [ "$SKIP_SERVICE" = false ]; then
-        setup_service
-    else
-        info "Skipping system service setup (--skip-service flag)"
-    fi
+    # Setup system service (mandatory)
+    setup_service
     
     show_usage
 }

@@ -1,0 +1,178 @@
+name: Auto Release on Version Change
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      new-version: ${{ steps.version-check.outputs.version }}
+      tag-exists: ${{ steps.tag-check.outputs.exists }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: version-check
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(grep '"version"' package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Get previous version (if exists)
+          PREVIOUS_VERSION=""
+          if git show HEAD~1:package.json 2>/dev/null | grep -q '"version"'; then
+            PREVIOUS_VERSION=$(git show HEAD~1:package.json | grep '"version"' | sed 's/.*"version": "\(.*\)".*/\1/')
+            echo "Previous version: $PREVIOUS_VERSION"
+          fi
+          
+          # Check if version changed
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ] && [ -n "$PREVIOUS_VERSION" ]; then
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if tag exists
+        id: tag-check
+        if: steps.version-check.outputs.changed == 'true'
+        run: |
+          VERSION=${{ steps.version-check.outputs.version }}
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag v$VERSION does not exist"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+  create-release:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: needs.check-version.outputs.version-changed == 'true' && needs.check-version.outputs.tag-exists == 'false'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build binaries
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        run: |
+          echo "Building for version: v$VERSION"
+          
+          # Clean any existing builds
+          bun run clean
+
+          # Build all binaries
+          bun run build:binaries
+
+          # Generate signing keys
+          mkdir -p keys
+          bun run scripts/sign-binaries.ts generate-keys
+
+      - name: Sign binaries
+        run: bun run scripts/sign-binaries.ts sign-all
+
+      - name: Create distribution
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        run: bun run scripts/create-distribution.ts
+
+      - name: Create Git tag
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        run: |
+          # Get commits since last tag (if any)
+          LAST_TAG=$(git tag --sort=-version:refname | grep -v "v$VERSION" | head -1)
+          
+          if [ -n "$LAST_TAG" ]; then
+            echo "Generating changelog since $LAST_TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$LAST_TAG..HEAD" --no-merges)
+          else
+            echo "Generating changelog for initial release"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+          
+          # Create release body
+          cat > release_body.md << EOF
+          ## QueryBird v$VERSION
+          
+          Automated release created from package.json version change.
+          
+          ### What's Included
+          - Cross-platform binaries for Linux, macOS, and Windows
+          - One-click installation script
+          - Built-in update functionality
+          - PostgreSQL initialization tools
+          - SHA256 checksums for verification
+          
+          ### Changes
+          $CHANGELOG
+          
+          ### Installation
+          \`\`\`bash
+          # One-click install (Linux/macOS)
+          curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
+          
+          # Or download binaries manually from the Assets section below
+          \`\`\`
+          
+          ### Update
+          If you have QueryBird installed, update with:
+          \`\`\`bash
+          querybird update install
+          \`\`\`
+          EOF
+          
+          echo "Release body created"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        with:
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          name: QueryBird v${{ needs.check-version.outputs.new-version }}
+          body_path: release_body.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          files: |
+            dist/releases/*.zip
+            dist/releases/querybird-v*-checksums.txt
+            install/install.sh
