@@ -33,6 +33,18 @@ program.name('querybird').description('QueryBird - Single Instance Job Scheduler
 // Set version for updater
 process.env.VERSION = VERSION;
 
+// Check for deprecated command-line arguments and provide migration guidance
+process.argv.forEach((arg, index) => {
+  if (arg === '--config-dir' || arg === '--secrets-dir') {
+    console.error(`❌ Error: ${arg} option is no longer supported in v${VERSION}`);
+    console.error(`📋 Migration Guide:`);
+    console.error(`   Old: querybird start --config-dir /path/to/config`);
+    console.error(`   New: QB_CONFIG_DIR=/path/to/config querybird start`);
+    console.error(`   For service updates, re-run the installer: curl -fsSL https://raw.githubusercontent.com/trutohq/querybird/main/install/install.sh | bash`);
+    process.exit(1);
+  }
+});
+
 program
   .command('start')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')

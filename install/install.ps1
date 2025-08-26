@@ -283,6 +283,28 @@ function Init-Postgres {
     }
 }
 
+# Check for old service configurations
+function Test-OldService {
+    Write-Log "Checking for old service configurations..." "Blue"
+    
+    $ServiceName = "QueryBird"
+    $Service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    
+    if ($Service) {
+        # Check if the service was configured with old command arguments
+        try {
+            $ServiceConfig = & nssm dump $ServiceName 2>$null
+            if ($ServiceConfig -match "--config-dir") {
+                Write-Log "Found old service configuration with --config-dir arguments" "Yellow"
+                Write-Log "Service will be updated with new QB_CONFIG_DIR environment variable" "Yellow"
+            }
+        } catch {
+            # Service exists but we can't check config, assume it needs updating
+            Write-Log "Found existing service - will be updated" "Yellow"
+        }
+    }
+}
+
 # Setup Windows service
 function Setup-Service {
     Write-Log "Setting up Windows service..." "Green"
@@ -300,12 +322,17 @@ function Setup-Service {
         return
     }
     
-    # Check if service already exists
+    # Check if service already exists and update it
     $Service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if ($Service) {
-        Write-Warn "Service '$ServiceName' already exists"
-        Write-Host "Remove existing service with: nssm remove $ServiceName confirm" -ForegroundColor $Colors["Yellow"]
-        return
+        Write-Log "Found existing QueryBird service - updating..." "Yellow"
+        try {
+            & nssm stop $ServiceName 2>$null
+            & nssm remove $ServiceName confirm
+            Write-Log "✓ Removed existing service for update" "Green"
+        } catch {
+            Write-Warn "Failed to remove existing service: $($_.Exception.Message)"
+        }
     }
     
     # Install service
@@ -381,6 +408,9 @@ function Main {
     $BinaryPath = Download-Binary -Version $LatestVersion -BinaryFile $BinaryFile
     Install-Binary -BinaryPath $BinaryPath
     Setup-Config
+    
+    # Check for and migrate old service configurations
+    Test-OldService
     
     # Initialize PostgreSQL (unless skipped)
     if (-not $SkipPostgres) {

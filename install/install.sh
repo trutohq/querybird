@@ -258,11 +258,43 @@ EOF
     log "Configuration directory: ${CONFIG_DIR}"
 }
 
+# Migrate old service configurations
+migrate_old_service() {
+    log "Checking for old service configurations..."
+    
+    if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
+        # Check if existing service uses old command arguments
+        if [ -f "/etc/systemd/system/querybird.service" ]; then
+            if grep -q -- "--config-dir" "/etc/systemd/system/querybird.service" 2>/dev/null; then
+                log "Found old service configuration with --config-dir arguments"
+                log "Service will be updated with new QB_CONFIG_DIR environment variable"
+            fi
+        fi
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        # Check if existing LaunchDaemon uses old command arguments  
+        if [ -f "/Library/LaunchDaemons/dev.querybird.plist" ]; then
+            if grep -q -- "--config-dir" "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null; then
+                log "Found old LaunchDaemon configuration with --config-dir arguments"
+                log "LaunchDaemon will be updated with new QB_CONFIG_DIR environment variable"
+            fi
+        fi
+    fi
+}
 
 # Setup system service
 setup_service() {
     if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
         log "Setting up systemd service..."
+        
+        # Check for existing service and stop it if running
+        if systemctl list-units --full --all | grep -q 'querybird.service'; then
+            log "Found existing querybird service - updating..."
+            if [ "$(id -u)" -eq 0 ]; then
+                systemctl stop querybird 2>/dev/null || true
+                systemctl disable querybird 2>/dev/null || true
+                log "✓ Stopped existing service for update"
+            fi
+        fi
         
         # Create service user if it doesn't exist
         if ! id -u querybird >/dev/null 2>&1; then
@@ -325,6 +357,15 @@ EOF
         fi
     elif [ "$(uname -s)" = "Darwin" ]; then
         log "Setting up LaunchDaemon for macOS..."
+        
+        # Check for existing LaunchDaemon and unload it
+        if [ -f "/Library/LaunchDaemons/dev.querybird.plist" ]; then
+            log "Found existing dev.querybird LaunchDaemon - updating..."
+            if [ "$(id -u)" -eq 0 ]; then
+                launchctl unload "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null || true
+                log "✓ Unloaded existing LaunchDaemon for update"
+            fi
+        fi
         
         # Ensure bun is available system-wide
         if [ -f "${HOME}/.bun/bin/bun" ] && [ ! -f "/usr/local/bin/bun" ]; then
@@ -480,6 +521,9 @@ main() {
     download_binary
     install_binary
     setup_config
+    
+    # Check for and migrate old service configurations
+    migrate_old_service
     
     # PostgreSQL initialization is done manually by user after installation
     
