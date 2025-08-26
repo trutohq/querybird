@@ -140,21 +140,28 @@ program
 
 program
   .command('init-postgres')
-  .option('--config-dir <path>', 'Config directory path', './configs')
-  .option('--secrets-dir <path>', 'Secrets directory path', './secrets')
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .description('Interactive setup for PostgreSQL data extraction job')
-  .action(async (opts: { configDir: string; secretsDir: string; encryptionKey?: string }) => {
+  .action(async (opts: { encryptionKey?: string }) => {
     const logger = new Logger();
 
     try {
+      // Use same environment variable logic as installer
+      const baseConfigDir = process.env.CONFIG_DIR || join(process.env.HOME || process.cwd(), '.querybird');
+      const configDir = join(baseConfigDir, 'configs');
+      const secretsDir = join(baseConfigDir, 'secrets');
+
+      logger.info(`🌍 Using CONFIG_DIR: ${baseConfigDir}`);
+      logger.info(`📁 Config directory: ${configDir}`);
+      logger.info(`🔒 Secrets directory: ${secretsDir}`);
+
       // Ensure directories exist
-      await mkdir(opts.configDir, { recursive: true });
-      await mkdir(opts.secretsDir, { recursive: true });
+      await mkdir(configDir, { recursive: true });
+      await mkdir(secretsDir, { recursive: true });
 
-      const setup = new PostgresSetup(join(opts.secretsDir, 'secrets.json'), opts.encryptionKey, logger);
+      const setup = new PostgresSetup(join(secretsDir, 'secrets.json'), opts.encryptionKey, logger);
 
-      await setup.initializePostgres(opts.configDir, opts.secretsDir);
+      await setup.initializePostgres(configDir, secretsDir);
     } catch (error) {
       logger.error('Setup failed:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
