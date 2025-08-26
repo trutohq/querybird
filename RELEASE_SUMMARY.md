@@ -86,10 +86,10 @@ bun run verify-binary
 
 ```bash
 # One-liner installation
-curl -fsSL https://github.com/your-org/querybird/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
 
 # Or download and run
-wget https://github.com/your-org/querybird/releases/latest/download/install.sh
+wget https://github.com/trutohq/querybird/releases/latest/download/install.sh
 bash install.sh
 ```
 
@@ -97,7 +97,7 @@ bash install.sh
 
 ```powershell
 # Download and run
-Invoke-WebRequest -Uri "https://github.com/your-org/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
+Invoke-WebRequest -Uri "https://github.com/trutohq/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
 .\install.ps1
 ```
 

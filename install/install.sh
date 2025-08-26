@@ -1,7 +1,7 @@
 #!/bin/bash
 # QueryBird Installation Script for Unix/Linux/macOS
 # Usage: curl -fsSL https://get.querybird.dev | bash
-# Or: bash <(curl -fsSL https://github.com/your-org/querybird/releases/latest/download/install.sh)
+# Or: bash <(curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh)
 
 set -e
 

@@ -17,7 +17,7 @@ git pull origin main
 
 ### 2. Create GitHub Release
 
-1. Go to [GitHub Releases](https://github.com/your-org/querybird/releases)
+1. Go to [GitHub Releases](https://github.com/trutohq/querybird/releases)
 2. Click "Create a new release"
 3. Choose a tag (e.g., `v2.0.0`)
 4. Write release notes
@@ -119,10 +119,10 @@ For automated signing in GitHub Actions, add these secrets:
 
 ```bash
 # One-liner installation
-curl -fsSL https://github.com/your-org/querybird/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
 
 # Or download and run
-wget https://github.com/your-org/querybird/releases/latest/download/install.sh
+wget https://github.com/trutohq/querybird/releases/latest/download/install.sh
 bash install.sh
 
 # Skip certain steps if needed
@@ -133,7 +133,7 @@ bash install.sh --skip-postgres --skip-service
 
 ```powershell
 # Download and run
-Invoke-WebRequest -Uri "https://github.com/your-org/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
+Invoke-WebRequest -Uri "https://github.com/trutohq/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
 .\install.ps1
 
 # Skip certain steps if needed

@@ -1,5 +1,5 @@
 # QueryBird Installation Script for Windows
-# Usage: Invoke-WebRequest -Uri "https://github.com/your-org/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
+# Usage: Invoke-WebRequest -Uri "https://github.com/trutohq/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
 #        .\install.ps1
 
 param(
@@ -65,7 +65,7 @@ if ($Help) {
 }
 
 # Configuration
-$Repo = "your-org/querybird"
+$Repo = "trutohq/querybird"
 $ConfigDir = "$env:USERPROFILE\.querybird"
 $BinaryName = "querybird.exe"
 

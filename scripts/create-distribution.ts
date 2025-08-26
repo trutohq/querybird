@@ -132,10 +132,10 @@ async function createReleaseNotes(): Promise<void> {
 ### 1. Download and Install
 \`\`\`bash
 # Linux/macOS
-curl -fsSL https://github.com/your-org/querybird/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
 
 # Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/your-org/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
+Invoke-WebRequest -Uri "https://github.com/trutohq/querybird/releases/latest/download/install.ps1" -OutFile "install.ps1"
 .\\install.ps1
 \`\`\`
 
@@ -196,9 +196,9 @@ querybird/
 
 ## Support
 
-- **Documentation**: https://github.com/your-org/querybird#readme
-- **Issues**: https://github.com/your-org/querybird/issues
-- **Discussions**: https://github.com/your-org/querybird/discussions
+- **Documentation**: https://github.com/trutohq/querybird#readme
+- **Issues**: https://github.com/trutohq/querybird/issues
+- **Discussions**: https://github.com/trutohq/querybird/discussions
 
 ---
 

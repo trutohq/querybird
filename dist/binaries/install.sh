@@ -1,12 +1,12 @@
 #!/bin/bash
 # QueryBird Installation Script for Unix/Linux/macOS
 # Usage: curl -fsSL https://get.querybird.dev | bash
-# Or: bash <(curl -fsSL https://github.com/your-org/querybird/releases/latest/download/install.sh)
+# Or: bash <(curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh)
 
 set -e
 
 # Configuration
-REPO="your-org/querybird"
+REPO="trutohq/querybird"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 CONFIG_DIR="${HOME}/.querybird"
 BINARY_NAME="querybird"
@@ -91,11 +91,32 @@ download_binary() {
     
     cd "${TMP_DIR}"
     
-    # Download binary
+    # Download binary (ZIP format from releases)
+    ZIP_FILE="${BINARY_FILE}-v${VERSION}.zip"
+    log "Downloading from: ${BASE_URL}/${ZIP_FILE}"
     if command -v curl >/dev/null 2>&1; then
-        curl -L -o "${BINARY_FILE}" "${BASE_URL}/${BINARY_FILE}" || error "Failed to download binary"
+        curl -L -o "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary from ${BASE_URL}/${ZIP_FILE}"
     else
-        wget -O "${BINARY_FILE}" "${BASE_URL}/${BINARY_FILE}" || error "Failed to download binary"
+        wget -O "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary from ${BASE_URL}/${ZIP_FILE}"
+    fi
+    
+    # Verify ZIP file was downloaded
+    if [ ! -f "${ZIP_FILE}" ]; then
+        error "ZIP file not found: ${ZIP_FILE}"
+    fi
+    log "Downloaded ZIP file: $(ls -lh ${ZIP_FILE})"
+    
+    # Extract binary from ZIP
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q "${ZIP_FILE}" || error "Failed to extract binary from ${ZIP_FILE}"
+        log "Extracted contents: $(ls -la)"
+    else
+        error "unzip command not found. Please install unzip."
+    fi
+    
+    # Verify binary was extracted
+    if [ ! -f "${BINARY_FILE}" ]; then
+        error "Binary not found after extraction: ${BINARY_FILE}"
     fi
 
     # Download signature file (optional)
@@ -139,13 +160,32 @@ install_binary() {
     fi
 
     # Install binary
-    if [ -w "${INSTALL_DIR}" ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        # Running as root, use direct cp
+        log "Installing as root user"
+        cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
+    elif [ -w "${INSTALL_DIR}" ]; then
+        # Directory is writable, use direct cp
+        log "Installing to writable directory"
         cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
     else
+        # Need sudo for installation
+        log "Requesting sudo permissions for installation"
         sudo cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
     fi
 
     # Verify installation
+    if [ -f "${INSTALL_DIR}/${BINARY_NAME}" ]; then
+        log "✓ Binary installed successfully at ${INSTALL_DIR}/${BINARY_NAME}"
+        # Test the binary
+        if "${INSTALL_DIR}/${BINARY_NAME}" --version >/dev/null 2>&1; then
+            INSTALLED_VERSION=$("${INSTALL_DIR}/${BINARY_NAME}" --version)
+            log "✓ Installation verified - QueryBird v${INSTALLED_VERSION}"
+        fi
+    else
+        error "Installation failed - binary not found at ${INSTALL_DIR}/${BINARY_NAME}"
+    fi
+    
     if ! command -v "${BINARY_NAME}" >/dev/null 2>&1; then
         warn "${INSTALL_DIR} may not be in your PATH"
         echo "Add ${INSTALL_DIR} to your PATH:"
@@ -218,22 +258,7 @@ EOF
     log "Configuration directory: ${CONFIG_DIR}"
 }
 
-# Initialize PostgreSQL configuration
-init_postgres() {
-    info "🔧 Initializing PostgreSQL configuration..."
-    
-    if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
-        log "Running PostgreSQL initialization..."
-        "${BINARY_NAME}" init-postgres --config-dir "${CONFIG_DIR}/configs" --secrets-dir "${CONFIG_DIR}/secrets" || {
-            warn "PostgreSQL initialization failed, but you can run it manually later:"
-            echo "  ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-        }
-    else
-        warn "QueryBird binary not found in PATH, skipping PostgreSQL initialization"
-        echo "Run this command after adding QueryBird to your PATH:"
-        echo "  ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-    fi
-}
+
 
 # Setup system service
 setup_service() {
@@ -368,12 +393,7 @@ show_usage() {
     echo "  Sample config:     ${CONFIG_DIR}/configs/sample.yml"
     echo ""
     
-    # PostgreSQL initialization status
-    if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
-        echo "PostgreSQL Setup:"
-        echo "  Run: ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-        echo ""
-    fi
+
     
     if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
         echo "Service Management:"
@@ -391,8 +411,7 @@ show_usage() {
     fi
     echo "Next steps:"
     echo "  1. Edit ${CONFIG_DIR}/configs/sample.yml"
-    echo "  2. Initialize PostgreSQL: ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-    echo "  3. Start the service: ${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs"
+    echo "  2. Start the service: ${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs"
     if [ "$(uname -s)" = "Linux" ] && command -v systemctl >/dev/null 2>&1; then
         echo "     Or as system service: sudo systemctl start querybird"
     elif [ "$(uname -s)" = "Darwin" ]; then
@@ -414,8 +433,6 @@ main() {
             echo ""
             echo "Options:"
             echo "  -h, --help     Show this help message"
-            echo "  --skip-postgres Skip PostgreSQL initialization"
-            echo "  --skip-service  Skip system service setup"
             echo ""
             echo "Environment variables:"
             echo "  INSTALL_DIR    Installation directory (default: /usr/local/bin)"
@@ -424,22 +441,7 @@ main() {
             ;;
     esac
     
-    # Parse options
-    SKIP_POSTGRES=false
-    SKIP_SERVICE=false
-    
-    for arg in "$@"; do
-        case $arg in
-            --skip-postgres)
-                SKIP_POSTGRES=true
-                shift
-                ;;
-            --skip-service)
-                SKIP_SERVICE=true
-                shift
-                ;;
-        esac
-    done
+    # No additional options needed
     
     # Trap cleanup on exit
     trap cleanup EXIT
@@ -451,19 +453,10 @@ main() {
     install_binary
     setup_config
     
-    # Initialize PostgreSQL (unless skipped)
-    if [ "$SKIP_POSTGRES" = false ]; then
-        init_postgres
-    else
-        info "Skipping PostgreSQL initialization (--skip-postgres flag)"
-    fi
+    # PostgreSQL initialization is done manually by user after installation
     
-    # Setup system service (unless skipped)
-    if [ "$SKIP_SERVICE" = false ]; then
-        setup_service
-    else
-        info "Skipping system service setup (--skip-service flag)"
-    fi
+    # Setup system service (mandatory)
+    setup_service
     
     show_usage
 }

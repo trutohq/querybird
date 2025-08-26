@@ -121,10 +121,10 @@ bun run build
 
 ```bash
 # Install globally
-bun install -g @your-org/querybird
+bun install -g @trutohq/querybird
 
 # Or run directly
-bunx @your-org/querybird
+bunx @trutohq/querybird
 ```
 
 ### Binary Installation
