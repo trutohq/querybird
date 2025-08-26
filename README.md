@@ -25,9 +25,10 @@ source ~/.bashrc  # or restart terminal
 
 ### Installation Steps
 1. **Download and extract**:
+   - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest) 
+   - Download `querybird-linux-x64-v<version>.zip` (or ARM64 version)
+   - Extract the zip file:
    ```bash
-   # Download latest release (replace with actual version)
-   wget https://github.com/trutohq/querybird/releases/latest/download/querybird-linux-x64-v<version>.zip
    unzip querybird-linux-x64-v<version>.zip
    cd querybird-linux-x64-v<version>
    ```
@@ -95,10 +96,11 @@ sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
 
 ### Installation Steps
 1. **Download and extract**:
+   - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest)
+   - Download `querybird-darwin-arm64-v<version>.zip` (or x64 version for Intel Macs)
+   - Extract the zip file:
    ```bash
-   # Download latest release (replace with actual version)
-   curl -L -o querybird-darwin-arm64.zip https://github.com/trutohq/querybird/releases/latest/download/querybird-darwin-arm64-v<version>.zip
-   unzip querybird-darwin-arm64.zip
+   unzip querybird-darwin-arm64-v<version>.zip
    cd querybird-darwin-arm64-v<version>
    ```
 
@@ -172,10 +174,11 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
 
 ### Installation Steps
 1. **Download and extract**:
+   - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest)
+   - Download `querybird-windows-x64-v<version>.zip` (or ARM64 version)
+   - Extract the zip file and navigate to the folder:
    ```powershell
-   # Download latest release (replace with actual version)
-   Invoke-WebRequest -Uri "https://github.com/trutohq/querybird/releases/latest/download/querybird-windows-x64-v<version>.zip" -OutFile "querybird-windows-x64.zip"
-   Expand-Archive -Path "querybird-windows-x64.zip" -DestinationPath "."
+   Expand-Archive -Path "querybird-windows-x64-v<version>.zip" -DestinationPath "."
    cd querybird-windows-x64-v<version>
    ```
 
