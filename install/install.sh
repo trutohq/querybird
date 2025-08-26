@@ -93,17 +93,30 @@ download_binary() {
     
     # Download binary (ZIP format from releases)
     ZIP_FILE="${BINARY_FILE}-v${VERSION}.zip"
+    log "Downloading from: ${BASE_URL}/${ZIP_FILE}"
     if command -v curl >/dev/null 2>&1; then
-        curl -L -o "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary"
+        curl -L -o "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary from ${BASE_URL}/${ZIP_FILE}"
     else
-        wget -O "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary"
+        wget -O "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary from ${BASE_URL}/${ZIP_FILE}"
     fi
+    
+    # Verify ZIP file was downloaded
+    if [ ! -f "${ZIP_FILE}" ]; then
+        error "ZIP file not found: ${ZIP_FILE}"
+    fi
+    log "Downloaded ZIP file: $(ls -lh ${ZIP_FILE})"
     
     # Extract binary from ZIP
     if command -v unzip >/dev/null 2>&1; then
-        unzip -q "${ZIP_FILE}" || error "Failed to extract binary"
+        unzip -q "${ZIP_FILE}" || error "Failed to extract binary from ${ZIP_FILE}"
+        log "Extracted contents: $(ls -la)"
     else
         error "unzip command not found. Please install unzip."
+    fi
+    
+    # Verify binary was extracted
+    if [ ! -f "${BINARY_FILE}" ]; then
+        error "Binary not found after extraction: ${BINARY_FILE}"
     fi
 
     # Download signature file (optional)
@@ -154,6 +167,17 @@ install_binary() {
     fi
 
     # Verify installation
+    if [ -f "${INSTALL_DIR}/${BINARY_NAME}" ]; then
+        log "✓ Binary installed successfully at ${INSTALL_DIR}/${BINARY_NAME}"
+        # Test the binary
+        if "${INSTALL_DIR}/${BINARY_NAME}" --version >/dev/null 2>&1; then
+            INSTALLED_VERSION=$("${INSTALL_DIR}/${BINARY_NAME}" --version)
+            log "✓ Installation verified - QueryBird v${INSTALLED_VERSION}"
+        fi
+    else
+        error "Installation failed - binary not found at ${INSTALL_DIR}/${BINARY_NAME}"
+    fi
+    
     if ! command -v "${BINARY_NAME}" >/dev/null 2>&1; then
         warn "${INSTALL_DIR} may not be in your PATH"
         echo "Add ${INSTALL_DIR} to your PATH:"
