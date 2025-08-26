@@ -4,12 +4,12 @@ import { existsSync, readFileSync } from 'fs';
 import { Logger } from './logger';
 
 // Read version from package.json or environment variable
-let currentVersion = process.env.VERSION;
+let currentVersion: string = process.env.VERSION || '';
 if (!currentVersion) {
   try {
     const packageJsonPath = join(import.meta.dirname, '..', '..', 'package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-    currentVersion = packageJson.version;
+    currentVersion = packageJson.version || '1.0.0';
   } catch {
     currentVersion = '1.0.0'; // Fallback version
   }

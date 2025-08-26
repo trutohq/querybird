@@ -13,10 +13,10 @@ Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 ### One-Click Install (Linux/macOS)
 
 ```bash
-curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash
 ```
 
-Automatically downloads, installs, and sets up system service.
+Automatically downloads, installs, and sets up system service. Requires `sudo` for system-wide installation.
 
 ### Windows Installation
 

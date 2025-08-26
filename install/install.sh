@@ -91,11 +91,19 @@ download_binary() {
     
     cd "${TMP_DIR}"
     
-    # Download binary
+    # Download binary (ZIP format from releases)
+    ZIP_FILE="${BINARY_FILE}-v${VERSION}.zip"
     if command -v curl >/dev/null 2>&1; then
-        curl -L -o "${BINARY_FILE}" "${BASE_URL}/${BINARY_FILE}" || error "Failed to download binary"
+        curl -L -o "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary"
     else
-        wget -O "${BINARY_FILE}" "${BASE_URL}/${BINARY_FILE}" || error "Failed to download binary"
+        wget -O "${ZIP_FILE}" "${BASE_URL}/${ZIP_FILE}" || error "Failed to download binary"
+    fi
+    
+    # Extract binary from ZIP
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q "${ZIP_FILE}" || error "Failed to extract binary"
+    else
+        error "unzip command not found. Please install unzip."
     fi
 
     # Download signature file (optional)

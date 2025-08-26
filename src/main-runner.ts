@@ -14,12 +14,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 
 // Read version from package.json or environment variable
-let VERSION = process.env.VERSION;
+let VERSION: string = process.env.VERSION || '';
 if (!VERSION) {
   try {
     const packageJsonPath = join(__dirname, '..', 'package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-    VERSION = packageJson.version;
+    VERSION = packageJson.version || '1.0.0';
   } catch {
     VERSION = '1.0.0'; // Fallback version
   }
