@@ -160,9 +160,17 @@ install_binary() {
     fi
 
     # Install binary
-    if [ -w "${INSTALL_DIR}" ] || [ "$(id -u)" -eq 0 ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        # Running as root, use direct cp
+        log "Installing as root user"
+        cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
+    elif [ -w "${INSTALL_DIR}" ]; then
+        # Directory is writable, use direct cp
+        log "Installing to writable directory"
         cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
     else
+        # Need sudo for installation
+        log "Requesting sudo permissions for installation"
         sudo cp "${DOWNLOAD_PATH}" "${INSTALL_DIR}/${BINARY_NAME}"
     fi
 
