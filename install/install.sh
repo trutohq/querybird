@@ -258,22 +258,6 @@ EOF
     log "Configuration directory: ${CONFIG_DIR}"
 }
 
-# Initialize PostgreSQL configuration
-init_postgres() {
-    info "🔧 Initializing PostgreSQL configuration..."
-    
-    if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
-        log "Running PostgreSQL initialization..."
-        "${BINARY_NAME}" init-postgres --config-dir "${CONFIG_DIR}/configs" --secrets-dir "${CONFIG_DIR}/secrets" || {
-            warn "PostgreSQL initialization failed, but you can run it manually later:"
-            echo "  ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-        }
-    else
-        warn "QueryBird binary not found in PATH, skipping PostgreSQL initialization"
-        echo "Run this command after adding QueryBird to your PATH:"
-        echo "  ${BINARY_NAME} init-postgres --config-dir ${CONFIG_DIR}/configs --secrets-dir ${CONFIG_DIR}/secrets"
-    fi
-}
 
 # Setup system service
 setup_service() {
@@ -454,7 +438,6 @@ main() {
             echo ""
             echo "Options:"
             echo "  -h, --help     Show this help message"
-            echo "  --skip-postgres Skip PostgreSQL initialization"
             echo ""
             echo "Environment variables:"
             echo "  INSTALL_DIR    Installation directory (default: /usr/local/bin)"
@@ -463,17 +446,7 @@ main() {
             ;;
     esac
     
-    # Parse options
-    SKIP_POSTGRES=false
-    
-    for arg in "$@"; do
-        case $arg in
-            --skip-postgres)
-                SKIP_POSTGRES=true
-                shift
-                ;;
-        esac
-    done
+    # No additional options needed
     
     # Trap cleanup on exit
     trap cleanup EXIT
@@ -485,12 +458,7 @@ main() {
     install_binary
     setup_config
     
-    # Initialize PostgreSQL (unless skipped)
-    if [ "$SKIP_POSTGRES" = false ]; then
-        init_postgres
-    else
-        info "Skipping PostgreSQL initialization (--skip-postgres flag)"
-    fi
+    # PostgreSQL initialization is done manually by user after installation
     
     # Setup system service (mandatory)
     setup_service

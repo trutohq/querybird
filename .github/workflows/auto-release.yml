@@ -132,22 +132,13 @@ jobs:
           cat > release_body.md << EOF
           ## QueryBird v$VERSION
           
-          Automated release created from package.json version change.
-          
-          ### What's Included
-          - Cross-platform binaries for Linux, macOS, and Windows
-          - One-click installation script
-          - Built-in update functionality
-          - PostgreSQL initialization tools
-          - SHA256 checksums for verification
-          
           ### Changes
           $CHANGELOG
           
           ### Installation
           \`\`\`bash
           # One-click install (Linux/macOS)
-          curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash
+          curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash
           
           # Or download binaries manually from the Assets section below
           \`\`\`

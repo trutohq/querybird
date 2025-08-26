@@ -58,14 +58,23 @@ querybird update check
 querybird update install
 ```
 
-## Usage
+## Getting Started
+
+After installation, follow these steps:
 
 ```bash
-# Start QueryBird
-querybird start --config-dir ~/.querybird/configs
-
-# Initialize PostgreSQL setup
+# 1. Initialize PostgreSQL configuration (interactive)
 querybird init-postgres --config-dir ~/.querybird/configs --secrets-dir ~/.querybird/secrets
+
+# 2. Edit configuration files (optional)
+# Edit ~/.querybird/configs/sample.yml to customize your jobs
+
+# 3. Start QueryBird service
+sudo systemctl start querybird    # Linux
+sudo launchctl start dev.querybird    # macOS
+
+# 4. Check service status
+sudo systemctl status querybird    # Linux
 ```
 
 ## Service Management
