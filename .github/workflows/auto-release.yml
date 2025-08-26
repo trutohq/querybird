@@ -17,7 +17,7 @@ jobs:
       version-changed: ${{ steps.version-check.outputs.changed }}
       new-version: ${{ steps.version-check.outputs.version }}
       tag-exists: ${{ steps.tag-check.outputs.exists }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,14 +30,14 @@ jobs:
           # Get current version
           CURRENT_VERSION=$(grep '"version"' package.json | sed 's/.*"version": "\(.*\)".*/\1/')
           echo "Current version: $CURRENT_VERSION"
-          
+
           # Get previous version (if exists)
           PREVIOUS_VERSION=""
           if git show HEAD~1:package.json 2>/dev/null | grep -q '"version"'; then
             PREVIOUS_VERSION=$(git show HEAD~1:package.json | grep '"version"' | sed 's/.*"version": "\(.*\)".*/\1/')
             echo "Previous version: $PREVIOUS_VERSION"
           fi
-          
+
           # Check if version changed
           if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ] && [ -n "$PREVIOUS_VERSION" ]; then
             echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
@@ -66,7 +66,7 @@ jobs:
     needs: check-version
     runs-on: ubuntu-latest
     if: needs.check-version.outputs.version-changed == 'true' && needs.check-version.outputs.tag-exists == 'false'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
           VERSION: ${{ needs.check-version.outputs.new-version }}
         run: |
           echo "Building for version: v$VERSION"
-          
+
           # Clean any existing builds
           bun run clean
 
@@ -119,7 +119,7 @@ jobs:
         run: |
           # Get commits since last tag (if any)
           LAST_TAG=$(git tag --sort=-version:refname | grep -v "v$VERSION" | head -1)
-          
+
           if [ -n "$LAST_TAG" ]; then
             echo "Generating changelog since $LAST_TAG"
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$LAST_TAG..HEAD" --no-merges)
@@ -127,7 +127,7 @@ jobs:
             echo "Generating changelog for initial release"
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
           fi
-          
+
           # Create release body
           cat > release_body.md << EOF
           ## QueryBird v$VERSION
@@ -135,7 +135,7 @@ jobs:
           ### Changes
           $CHANGELOG
           EOF
-          
+
           echo "Release body created"
 
       - name: Create GitHub Release
