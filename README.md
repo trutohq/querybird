@@ -10,6 +10,55 @@ Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Installation
 
+### 🚀 Automatic Installation (Recommended)
+
+**macOS and Linux:**
+```bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+```
+
+This script will:
+- Detect your platform automatically (macOS/Linux, x64/ARM64)
+- Download the latest QueryBird release
+- Install the binary to `/usr/local/bin/querybird`
+- Set up configuration directories
+- Create sample configuration files
+- Install system service (LaunchDaemon on macOS, systemd on Linux)
+
+**After installation, complete the setup:**
+
+1. **Initialize PostgreSQL configuration** (interactive):
+   ```bash
+   querybird init-postgres --config-dir ~/.querybird/configs --secrets-dir ~/.querybird/secrets
+   ```
+
+2. **Start the service**:
+   ```bash
+   # macOS
+   sudo launchctl start dev.querybird
+   
+   # Linux
+   sudo systemctl start querybird
+   ```
+
+3. **Verify it's running**:
+   ```bash
+   # macOS - check service status
+   launchctl print system/dev.querybird
+   
+   # Linux - check service status
+   sudo systemctl status querybird
+   ```
+
+**To install to a custom directory:**
+```bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | INSTALL_DIR="$HOME/.local/bin" bash /dev/stdin
+```
+
+---
+
+### 📋 Manual Installation
+
 Choose your operating system for detailed installation instructions:
 
 ---
@@ -288,6 +337,57 @@ This will interactively set up your database connection and create sample job co
 - **"env: bun: No such file or directory"**: Install Bun and create system-wide symlink (see step 1 above)
 - **"Bootstrap failed: 5: Input/output error"**: Service may already be loaded, try unloading first
 - **"last exit code = 127"**: Command not found - PATH issue (see step 3 above)
+
+## 🔄 Updating QueryBird
+
+### Safe Update (Preserves Config and Secrets)
+
+The install script is designed to safely update QueryBird without affecting your existing configurations or secrets.
+
+**Update Command:**
+```bash
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+```
+
+**What the update preserves:**
+- ✅ Existing configurations in `~/.querybird/configs/`
+- ✅ Existing secrets in `~/.querybird/secrets/`
+- ✅ Directory structure and permissions
+- ✅ Service configuration
+
+**Update Process:**
+
+1. **Stop the service** (if running):
+   ```bash
+   # macOS
+   sudo launchctl stop dev.querybird
+   
+   # Linux
+   sudo systemctl stop querybird
+   ```
+
+2. **Run the install script**:
+   ```bash
+   curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+   ```
+
+3. **Start the service**:
+   ```bash
+   # macOS
+   sudo launchctl start dev.querybird
+   
+   # Linux
+   sudo systemctl start querybird
+   ```
+
+4. **Verify the update**:
+   ```bash
+   querybird --version
+   ```
+
+The script only creates sample configurations if they don't already exist, ensuring your custom settings remain intact during updates.
+
+---
 
 ## Support
 
