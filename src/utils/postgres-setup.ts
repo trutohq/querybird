@@ -239,60 +239,61 @@ export class PostgresSetup {
       };
     }
 
-    // Build transform - handle single vs multiple databases
+    // Build transform - handle single vs multiple databases using new array format
     let transform: string;
     if (databases.length > 1) {
-      // Multi-database transform using $merge with new nested structure
+      // Multi-database transform using array format with conditional checks
       const transformParts = databases.map(
         (db) =>
-          `${db.name}.users.{
-    "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity Type": "identity",
-    "Entity Source Type": "user",
-    "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity Username": username,
-    "Entity Email": username,
-    "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity - Has Access To Entity Type": "connection",
-    "Entity - Has Access To Source Type": "role",
-    "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
-    "Entity - Has Access To Permission Value": "true",
-    "Entity Status": can_login ? "active" : "inactive",
-    "Entity First Name": $substringBefore(username, "."),
-    "Entity Last Name": $substringAfter(username, "."),
-    "Entity LastLoginTime": last_login_time,
-    "Entity LastPasswordChangedTime": last_password_changed_time,
-    "Entity MfaEnabled": "false"
-  }`
+          `    (${db.name}.users ? ${db.name}.users.{
+      "Project": "${jobConfig.name}",
+      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Type": "identity",
+      "Entity Source Type": "user",
+      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Username": username,
+      "Entity Email": username,
+      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Entity Type": "connection",
+      "Entity - Has Access To Source Type": "role",
+      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
+      "Entity - Has Access To Permission Value": "true",
+      "Entity Status": can_login ? "active" : "inactive",
+      "Entity First Name": $substringBefore(username, "."),
+      "Entity Last Name": $substringAfter(username, "."),
+      "Entity LastLoginTime": last_login_time,
+      "Entity LastPasswordChangedTime": last_password_changed_time,
+      "Entity MfaEnabled": "false"
+    } : [])`
       );
 
-      transform = `$merge([\n  ${transformParts.join(',\n  ')}\n])`;
+      transform = `[\n${transformParts.join(',\n')}\n  ]`;
     } else {
-      // Single database transform - now using named database structure
+      // Single database transform using array format with conditional check
       const db = databases[0];
-      transform = `${db.name}.users.{
-    "Project": "${jobConfig.name}",
-    "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity Type": "identity",
-    "Entity Source Type": "user", 
-    "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity Username": username,
-    "Entity Email": username,
-    "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-    "Entity - Has Access To Entity Type": "connection",
-    "Entity - Has Access To Source Type": "role",
-    "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
-    "Entity - Has Access To Permission Value": "true",
-    "Entity Status": can_login ? "active" : "inactive",
-    "Entity First Name": $substringBefore(username, "."),
-    "Entity Last Name": $substringAfter(username, "."),
-    "Entity LastLoginTime": last_login_time,
-    "Entity LastPasswordChangedTime": last_password_changed_time,
-    "Entity MfaEnabled": "false"
-  }`;
+      transform = `[\n    (${db.name}.users ? ${db.name}.users.{
+      "Project": "${jobConfig.name}",
+      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Type": "identity",
+      "Entity Source Type": "user",
+      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity Username": username,
+      "Entity Email": username,
+      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+      "Entity - Has Access To Entity Type": "connection",
+      "Entity - Has Access To Source Type": "role",
+      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
+      "Entity - Has Access To Permission Value": "true",
+      "Entity Status": can_login ? "active" : "inactive",
+      "Entity First Name": $substringBefore(username, "."),
+      "Entity Last Name": $substringAfter(username, "."),
+      "Entity LastLoginTime": last_login_time,
+      "Entity LastPasswordChangedTime": last_password_changed_time,
+      "Entity MfaEnabled": "false"
+    } : [])
+  ]`;
     }
 
     // Build the complete configuration

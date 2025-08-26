@@ -135,7 +135,7 @@ export class JobRunner {
       const duration = Date.now() - startTime;
       execution.status = 'completed';
       execution.duration = duration;
-      execution.result = { recordCount: Array.isArray(transformedData) ? transformedData.length : 1 };
+      execution.result = { recordCount: Array.isArray(transformedData) ? transformedData.length : (transformedData ? 1 : 0) };
 
       this.logger.info(`Job ${job.id} completed successfully in ${duration}ms`);
     } catch (error) {
