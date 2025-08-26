@@ -10,53 +10,57 @@ Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Install
 
-### One-Click Install (Linux/macOS)
+### Download and Extract
 
-```bash
-curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash
-```
+1. **Download** the zip file for your platform from [Releases](https://github.com/trutohq/querybird/releases):
+   - Linux: `querybird-linux-x64-v<version>.zip` or `querybird-linux-arm64-v<version>.zip`
+   - macOS: `querybird-darwin-x64-v<version>.zip` or `querybird-darwin-arm64-v<version>.zip`  
+   - Windows: `querybird-windows-x64-v<version>.zip` or `querybird-windows-arm64-v<version>.zip`
 
-Automatically downloads, installs, and sets up system service. Requires `sudo` for system-wide installation.
+2. **Extract** the zip file to your desired location
 
-### Windows Installation
+### Linux/macOS Setup
 
-Windows requires manual setup:
+1. **Install binary**:
+   ```bash
+   sudo cp querybird-<platform>-<arch> /usr/local/bin/querybird
+   sudo chmod +x /usr/local/bin/querybird
+   ```
 
-1. **Download**: Get `querybird-windows-x64.exe` or `querybird-windows-arm64.exe` from [Releases](https://github.com/trutohq/querybird/releases)
+2. **Setup PostgreSQL**:
+   ```bash
+   ./setup/setup-postgres.sh
+   ```
 
-2. **Install**:
-   ```powershell
-   # Create directories
-   New-Item -ItemType Directory -Force -Path 'C:\Program Files\QueryBird','C:\QueryBird\configs','C:\QueryBird\secrets'
+3. **Install as system service**:
+   ```bash
+   # Copy service file
+   sudo cp services/querybird.service /etc/systemd/system/  # Linux
+   sudo cp services/dev.querybird.plist /Library/LaunchDaemons/  # macOS
    
-   # Copy binary
-   Copy-Item .\querybird-windows-<arch>.exe 'C:\Program Files\QueryBird\querybird.exe'
+   # Enable and start
+   sudo systemctl enable querybird && sudo systemctl start querybird  # Linux
+   sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist  # macOS
    ```
 
-3. **Setup Service**:
+### Windows Setup
+
+1. **Install binary**:
    ```powershell
-   # Create and start Windows service
-   sc.exe create QueryBird binPath= "C:\Program Files\QueryBird\querybird.exe start --config-dir C:\QueryBird\configs --secrets-dir C:\QueryBird\secrets" start= auto
-   sc.exe start QueryBird
+   # Create directories and copy binary
+   New-Item -ItemType Directory -Force -Path 'C:\Program Files\QueryBird'
+   Copy-Item querybird-windows-<arch>.exe 'C:\Program Files\QueryBird\querybird.exe'
    ```
 
-### Manual Download
+2. **Setup PostgreSQL**:
+   ```powershell
+   .\setup\setup-postgres.bat
+   ```
 
-Download binaries from [Releases](https://github.com/trutohq/querybird/releases):
-
-- Linux: `querybird-linux-x64` or `querybird-linux-arm64`
-- macOS: `querybird-darwin-x64` or `querybird-darwin-arm64`  
-- Windows: `querybird-windows-x64.exe` or `querybird-windows-arm64.exe`
-
-## Update
-
-```bash
-# Check for updates
-querybird update check
-
-# Update to latest version
-querybird update install
-```
+3. **Install as Windows service** (requires [NSSM](https://nssm.cc/)):
+   ```powershell
+   .\services\install-windows-service.bat
+   ```
 
 ## Getting Started
 

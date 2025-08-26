@@ -134,20 +134,6 @@ jobs:
           
           ### Changes
           $CHANGELOG
-          
-          ### Installation
-          \`\`\`bash
-          # One-click install (Linux/macOS)
-          curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash
-          
-          # Or download binaries manually from the Assets section below
-          \`\`\`
-          
-          ### Update
-          If you have QueryBird installed, update with:
-          \`\`\`bash
-          querybird update install
-          \`\`\`
           EOF
           
           echo "Release body created"
