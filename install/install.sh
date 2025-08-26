@@ -8,7 +8,7 @@ set -e
 # Configuration
 REPO="trutohq/querybird"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-CONFIG_DIR="${HOME}/.querybird"
+CONFIG_DIR="${CONFIG_DIR:-${HOME}/.querybird}"
 BINARY_NAME="querybird"
 
 # Colors for output
@@ -267,10 +267,10 @@ setup_service() {
         # Create service user if it doesn't exist
         if ! id -u querybird >/dev/null 2>&1; then
             if [ "$(id -u)" -eq 0 ]; then
-                useradd -r -s /bin/false -d /opt/querybird querybird
-                mkdir -p /opt/querybird/{configs,secrets,watermarks,outputs,logs}
-                chown -R querybird:querybird /opt/querybird
-                chmod 700 /opt/querybird/secrets
+                useradd -r -s /bin/false -d ${CONFIG_DIR} querybird
+                mkdir -p ${CONFIG_DIR}/{configs,secrets,watermarks,outputs,logs}
+                chown -R querybird:querybird ${CONFIG_DIR}
+                chmod 700 ${CONFIG_DIR}/secrets
             else
                 warn "Run as root to create system service, or manually create querybird user"
                 return
@@ -278,7 +278,7 @@ setup_service() {
         fi
         
         # Create systemd service file
-        cat > /tmp/querybird.service << 'EOF'
+        cat > /tmp/querybird.service << EOF
 [Unit]
 Description=QueryBird Job Scheduler
 After=network.target postgresql.service
@@ -288,9 +288,9 @@ Wants=postgresql.service
 Type=simple
 User=querybird
 Group=querybird
-WorkingDirectory=/opt/querybird
-ExecStart=/usr/local/bin/querybird start --config-dir /opt/querybird/configs --log-level info
-ExecReload=/bin/kill -HUP $MAINPID
+WorkingDirectory=${CONFIG_DIR}
+ExecStart=${INSTALL_DIR}/${BINARY_NAME} start --config-dir ${CONFIG_DIR}/configs --log-level info
+ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -301,10 +301,11 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/opt/querybird
+ReadWritePaths=${CONFIG_DIR}
 
 # Environment
 Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
 [Install]
 WantedBy=multi-user.target
@@ -324,6 +325,16 @@ EOF
     elif [ "$(uname -s)" = "Darwin" ]; then
         log "Setting up LaunchDaemon for macOS..."
         
+        # Ensure bun is available system-wide
+        if [ -f "${HOME}/.bun/bin/bun" ] && [ ! -f "/usr/local/bin/bun" ]; then
+            if [ "$(id -u)" -eq 0 ]; then
+                ln -sf "${HOME}/.bun/bin/bun" "/usr/local/bin/bun"
+                log "✓ Created system-wide bun symlink"
+            else
+                warn "Run as root to create system-wide bun symlink: sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun"
+            fi
+        fi
+        
         # Create LaunchDaemon plist
         cat > "/tmp/dev.querybird.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -334,7 +345,7 @@ EOF
     <string>dev.querybird</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/querybird</string>
+        <string>${INSTALL_DIR}/${BINARY_NAME}</string>
         <string>start</string>
         <string>--config-dir</string>
         <string>${CONFIG_DIR}/configs</string>
@@ -351,6 +362,13 @@ EOF
     <string>${CONFIG_DIR}/logs/querybird.error.log</string>
     <key>WorkingDirectory</key>
     <string>${CONFIG_DIR}</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>${HOME}</string>
+    </dict>
 </dict>
 </plist>
 EOF
@@ -361,9 +379,13 @@ EOF
             log "✓ LaunchDaemon installed and loaded"
             log "Start with: sudo launchctl start dev.querybird"
             log "Stop with: sudo launchctl stop dev.querybird"
+            log "Status: launchctl print system/dev.querybird"
         else
             warn "Run as root to install LaunchDaemon"
             log "LaunchDaemon file created at /tmp/dev.querybird.plist"
+            log "To install manually:"
+            log "  sudo mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
+            log "  sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist"
         fi
     else
         log "Manual service setup required for this OS"
