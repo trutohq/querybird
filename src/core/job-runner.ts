@@ -345,9 +345,21 @@ export class JobRunner {
 
   private async applyTransformation(data: unknown, transformExpression: string): Promise<unknown> {
     try {
+      this.logger.debug('Input data for transformation:', { data: JSON.stringify(data, null, 2) });
+      this.logger.debug('Transform expression:', { expression: transformExpression });
+      
       const expr = jsonata(transformExpression);
-      return await expr.evaluate(data);
+      const result = await expr.evaluate(data);
+      
+      this.logger.debug('Transformation result:', { result: JSON.stringify(result, null, 2) });
+      return result;
     } catch (error) {
+      this.logger.error('Transformation error details:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        data: JSON.stringify(data, null, 2),
+        expression: transformExpression
+      });
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Transformation failed: ${errorMessage}`);
     }
