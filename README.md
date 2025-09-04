@@ -23,7 +23,7 @@ curl -fsSL https://bun.sh/install | bash
 source ~/.bashrc  # or restart terminal
 
 # Install QueryBird
-curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash /dev/stdin
 ```
 
 This script will:
@@ -41,6 +41,7 @@ This script will:
    ```bash
    querybird init-postgres
    ```
+   📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 2. **Start the service**:
    ```bash
@@ -62,7 +63,7 @@ This script will:
 
 **To install to a custom directory:**
 ```bash
-curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | INSTALL_DIR="$HOME/.local/bin" bash /dev/stdin
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | INSTALL_DIR="$HOME/.local/bin" sudo bash /dev/stdin
 ```
 
 ---
@@ -110,6 +111,7 @@ source ~/.bashrc  # or restart terminal
    ```bash
    sudo -u querybird querybird init-postgres
    ```
+   📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 5. **Install as systemd service**:
    ```bash
@@ -179,6 +181,7 @@ sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
    ```bash
    querybird init-postgres
    ```
+   📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 5. **Install as LaunchDaemon**:
    ```bash
@@ -259,6 +262,7 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```powershell
    & 'C:\Program Files\QueryBird\querybird.exe' init-postgres
    ```
+   📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 4. **Install as Windows service**:
    ```powershell
@@ -388,6 +392,8 @@ Interactive setup for PostgreSQL data extraction job
 querybird init-postgres
 ```
 
+📚 **For detailed configuration examples and advanced setup, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
+
 #### `querybird init-mysql [options]`
 Interactive setup for MySQL data extraction job
 
@@ -398,6 +404,8 @@ Interactive setup for MySQL data extraction job
 ```bash
 querybird init-mysql
 ```
+
+📚 **For detailed configuration examples and advanced setup, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 #### `querybird config-postgres [options]`
 Generate PostgreSQL config from existing secrets
@@ -564,7 +572,7 @@ The install script is designed to safely update QueryBird without affecting your
 
 **Update Command:**
 ```bash
-curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash /dev/stdin
 ```
 
 **What the update preserves:**
@@ -586,7 +594,7 @@ curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install
 
 2. **Run the install script**:
    ```bash
-   curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | bash /dev/stdin
+   curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash /dev/stdin
    ```
 
 3. **Start the service**:

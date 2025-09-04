@@ -352,8 +352,30 @@ EOF
             log "Start with: sudo systemctl start querybird"
             log "Check status: sudo systemctl status querybird"
         else
-            warn "Run as root to install systemd service"
-            log "Service file created at /tmp/querybird.service"
+            log "Systemd service installation requires sudo privileges..."
+            if command -v sudo >/dev/null 2>&1; then
+                if sudo mv /tmp/querybird.service /etc/systemd/system/ 2>/dev/null && \
+                   sudo systemctl daemon-reload 2>/dev/null && \
+                   sudo systemctl enable querybird 2>/dev/null; then
+                    log "✓ Systemd service installed and enabled with sudo"
+                    log "Start with: sudo systemctl start querybird"
+                    log "Check status: sudo systemctl status querybird"
+                else
+                    warn "Failed to install systemd service with sudo"
+                    log "Service file created at /tmp/querybird.service"
+                    log "To install manually:"
+                    log "  sudo mv /tmp/querybird.service /etc/systemd/system/"
+                    log "  sudo systemctl daemon-reload"
+                    log "  sudo systemctl enable querybird"
+                fi
+            else
+                warn "sudo not available - manual installation required"
+                log "Service file created at /tmp/querybird.service"
+                log "To install manually (as root):"
+                log "  mv /tmp/querybird.service /etc/systemd/system/"
+                log "  systemctl daemon-reload"
+                log "  systemctl enable querybird"
+            fi
         fi
     elif [ "$(uname -s)" = "Darwin" ]; then
         log "Setting up LaunchDaemon for macOS..."
@@ -423,11 +445,28 @@ EOF
             log "Stop with: sudo launchctl stop dev.querybird"
             log "Status: launchctl print system/dev.querybird"
         else
-            warn "Run as root to install LaunchDaemon"
-            log "LaunchDaemon file created at /tmp/dev.querybird.plist"
-            log "To install manually:"
-            log "  sudo mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
-            log "  sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist"
+            log "LaunchDaemon installation requires sudo privileges..."
+            if command -v sudo >/dev/null 2>&1; then
+                if sudo mv "/tmp/dev.querybird.plist" "/Library/LaunchDaemons/" 2>/dev/null && \
+                   sudo launchctl load "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null; then
+                    log "✓ LaunchDaemon installed and loaded with sudo"
+                    log "Start with: sudo launchctl start dev.querybird"
+                    log "Stop with: sudo launchctl stop dev.querybird"
+                    log "Status: launchctl print system/dev.querybird"
+                else
+                    warn "Failed to install LaunchDaemon with sudo"
+                    log "LaunchDaemon file created at /tmp/dev.querybird.plist"
+                    log "To install manually:"
+                    log "  sudo mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
+                    log "  sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist"
+                fi
+            else
+                warn "sudo not available - manual installation required"
+                log "LaunchDaemon file created at /tmp/dev.querybird.plist"
+                log "To install manually:"
+                log "  mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
+                log "  launchctl load /Library/LaunchDaemons/dev.querybird.plist"
+            fi
         fi
     else
         log "Manual service setup required for this OS"
