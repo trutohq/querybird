@@ -386,6 +386,13 @@ EOF
             if [ "$(id -u)" -eq 0 ]; then
                 launchctl unload "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null || true
                 log "✓ Unloaded existing LaunchDaemon for update"
+            else
+                if command -v sudo >/dev/null 2>&1; then
+                    sudo launchctl unload "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null || true
+                    log "✓ Unloaded existing LaunchDaemon for update"
+                else
+                    warn "Could not unload existing LaunchDaemon (requires sudo)"
+                fi
             fi
         fi
         
@@ -439,6 +446,8 @@ EOF
         
         if [ "$(id -u)" -eq 0 ]; then
             mv "/tmp/dev.querybird.plist" "/Library/LaunchDaemons/"
+            chown root:wheel "/Library/LaunchDaemons/dev.querybird.plist"
+            chmod 644 "/Library/LaunchDaemons/dev.querybird.plist"
             launchctl load "/Library/LaunchDaemons/dev.querybird.plist"
             log "✓ LaunchDaemon installed and loaded"
             log "Start with: sudo launchctl start dev.querybird"
@@ -448,6 +457,8 @@ EOF
             log "LaunchDaemon installation requires sudo privileges..."
             if command -v sudo >/dev/null 2>&1; then
                 if sudo mv "/tmp/dev.querybird.plist" "/Library/LaunchDaemons/" 2>/dev/null && \
+                   sudo chown root:wheel "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null && \
+                   sudo chmod 644 "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null && \
                    sudo launchctl load "/Library/LaunchDaemons/dev.querybird.plist" 2>/dev/null; then
                     log "✓ LaunchDaemon installed and loaded with sudo"
                     log "Start with: sudo launchctl start dev.querybird"
@@ -458,6 +469,8 @@ EOF
                     log "LaunchDaemon file created at /tmp/dev.querybird.plist"
                     log "To install manually:"
                     log "  sudo mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
+                    log "  sudo chown root:wheel /Library/LaunchDaemons/dev.querybird.plist"
+                    log "  sudo chmod 644 /Library/LaunchDaemons/dev.querybird.plist"
                     log "  sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist"
                 fi
             else
@@ -465,6 +478,8 @@ EOF
                 log "LaunchDaemon file created at /tmp/dev.querybird.plist"
                 log "To install manually:"
                 log "  mv /tmp/dev.querybird.plist /Library/LaunchDaemons/"
+                log "  chown root:wheel /Library/LaunchDaemons/dev.querybird.plist"
+                log "  chmod 644 /Library/LaunchDaemons/dev.querybird.plist"
                 log "  launchctl load /Library/LaunchDaemons/dev.querybird.plist"
             fi
         fi

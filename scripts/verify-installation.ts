@@ -196,20 +196,43 @@ async function checkSystemService(): Promise<VerificationResult> {
   } else if (os === 'darwin') {
     try {
       const { execSync } = await import('child_process');
-      const result = execSync('launchctl list | grep querybird', { encoding: 'utf8', stdio: 'pipe' });
+
+      // First check if the plist file exists and has correct permissions
+      try {
+        const statResult = execSync('ls -la /Library/LaunchDaemons/dev.querybird.plist', { encoding: 'utf8', stdio: 'pipe' });
+
+        if (!statResult.includes('root') || !statResult.includes('wheel')) {
+          return {
+            component: 'System Service (macOS)',
+            status: '⚠️',
+            message: 'QueryBird LaunchDaemon found but has incorrect permissions',
+            details: 'Fix with: sudo chown root:wheel /Library/LaunchDaemons/dev.querybird.plist && sudo chmod 644 /Library/LaunchDaemons/dev.querybird.plist',
+          };
+        }
+      } catch {
+        return {
+          component: 'System Service (macOS)',
+          status: '⚠️',
+          message: 'QueryBird LaunchDaemon plist file not found',
+          details: 'Install with: sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist',
+        };
+      }
+
+      // Then check if the service is loaded (system domain requires sudo)
+      const result = execSync('sudo launchctl list | grep querybird', { encoding: 'utf8', stdio: 'pipe' });
 
       return {
         component: 'System Service (macOS)',
         status: '✅',
-        message: 'QueryBird LaunchDaemon found',
-        details: 'Service appears to be configured',
+        message: 'QueryBird LaunchDaemon found and properly configured',
+        details: 'Service has correct ownership (root:wheel) and is loaded',
       };
     } catch {
       return {
         component: 'System Service (macOS)',
         status: '⚠️',
-        message: 'QueryBird LaunchDaemon not found',
-        details: 'Install with: sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist',
+        message: 'QueryBird LaunchDaemon not loaded',
+        details: 'Load with: sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist',
       };
     }
   } else if (os === 'win32') {

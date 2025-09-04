@@ -14,9 +14,11 @@ Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 ### 🚀 Automatic Installation (Recommended)
 
 **Prerequisites:**
+
 - **Bun runtime** (JavaScript runtime required)
 
 **macOS and Linux:**
+
 ```bash
 # Install Bun first (if not already installed)
 curl -fsSL https://bun.sh/install | bash
@@ -27,41 +29,48 @@ curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install
 ```
 
 This script will:
+
 - Detect your platform automatically (macOS/Linux, x64/ARM64)
 - Download the latest QueryBird release
 - Install the binary to `/usr/local/bin/querybird`
 - Set up configuration directories
 - Create sample configuration files
 - Install system service (LaunchDaemon on macOS, systemd on Linux)
+- **Automatically handle permissions** for macOS LaunchDaemon (no manual fixes needed)
 - **Note:** Bun must be installed separately as shown above
 
 **After installation, complete the setup:**
 
 1. **Initialize PostgreSQL configuration** (interactive):
+
    ```bash
    querybird init-postgres
    ```
+
    📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 2. **Start the service**:
+
    ```bash
    # macOS
    sudo launchctl start dev.querybird
-   
+
    # Linux
    sudo systemctl start querybird
    ```
 
 3. **Verify it's running**:
+
    ```bash
    # macOS - check service status
-   launchctl print system/dev.querybird
-   
+   sudo launchctl print system/dev.querybird
+
    # Linux - check service status
    sudo systemctl status querybird
    ```
 
 **To install to a custom directory:**
+
 ```bash
 curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | INSTALL_DIR="$HOME/.local/bin" sudo bash /dev/stdin
 ```
@@ -77,6 +86,7 @@ Choose your operating system for detailed installation instructions:
 ## 🐧 Linux Installation (Ubuntu/Debian/CentOS/RHEL)
 
 ### Prerequisites
+
 ```bash
 # Install Bun (JavaScript runtime)
 curl -fsSL https://bun.sh/install | bash
@@ -84,22 +94,27 @@ source ~/.bashrc  # or restart terminal
 ```
 
 ### Installation Steps
+
 1. **Download and extract**:
-   - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest) 
+
+   - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest)
    - Download `querybird-linux-x64-v<version>.zip` (or ARM64 version)
    - Extract the zip file:
+
    ```bash
    unzip querybird-linux-x64-v<version>.zip
    cd querybird-linux-x64-v<version>
    ```
 
 2. **Install binary**:
+
    ```bash
    sudo cp querybird-linux-x64 /usr/local/bin/querybird
    sudo chmod +x /usr/local/bin/querybird
    ```
 
 3. **Create QueryBird user and directories**:
+
    ```bash
    sudo useradd -r -s /bin/false querybird
    sudo mkdir -p /opt/querybird/{configs,secrets,watermarks,outputs,logs}
@@ -108,9 +123,11 @@ source ~/.bashrc  # or restart terminal
    ```
 
 4. **Setup PostgreSQL** (interactive configuration):
+
    ```bash
    sudo -u querybird querybird init-postgres
    ```
+
    📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 5. **Install as systemd service**:
@@ -122,6 +139,7 @@ source ~/.bashrc  # or restart terminal
    ```
 
 ### Service Management
+
 ```bash
 # Start service
 sudo systemctl start querybird
@@ -147,6 +165,7 @@ sudo systemctl enable querybird
 ## 🍎 macOS Installation
 
 ### Prerequisites
+
 ```bash
 # Install Bun (JavaScript runtime)
 curl -fsSL https://bun.sh/install | bash
@@ -156,49 +175,59 @@ sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
 ```
 
 ### Installation Steps
+
 1. **Download and extract**:
+
    - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest)
    - Download `querybird-darwin-arm64-v<version>.zip` (or x64 version for Intel Macs)
    - Extract the zip file:
+
    ```bash
    unzip querybird-darwin-arm64-v<version>.zip
    cd querybird-darwin-arm64-v<version>
    ```
 
 2. **Install binary**:
+
    ```bash
    sudo cp querybird-darwin-arm64 /usr/local/bin/querybird
    sudo chmod +x /usr/local/bin/querybird
    ```
 
 3. **Create directories**:
+
    ```bash
    sudo mkdir -p /opt/querybird/{configs,secrets,watermarks,outputs,logs}
    sudo chmod 700 /opt/querybird/secrets
    ```
 
 4. **Setup PostgreSQL** (interactive configuration):
+
    ```bash
    querybird init-postgres
    ```
+
    📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 5. **Install as LaunchDaemon**:
    ```bash
    sudo cp services/dev.querybird.plist /Library/LaunchDaemons/
+   sudo chown root:wheel /Library/LaunchDaemons/dev.querybird.plist
+   sudo chmod 644 /Library/LaunchDaemons/dev.querybird.plist
    sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
 ### Service Management
+
 ```bash
 # Start service
 sudo launchctl start dev.querybird
 
-# Stop service  
-sudo launchctl bootout system/dev.querybird
+# Stop service
+sudo launchctl stop dev.querybird
 
 # Check if service is loaded
-launchctl print system/dev.querybird
+sudo launchctl print system/dev.querybird
 
 # View standard logs
 cat ~/.querybird/logs/querybird.log
@@ -210,10 +239,10 @@ cat ~/.querybird/logs/querybird.error.log
 tail -f ~/.querybird/logs/querybird.error.log
 
 # Unload service (to disable)
-sudo launchctl bootout system/dev.querybird
+sudo launchctl unload /Library/LaunchDaemons/dev.querybird.plist
 
 # Reload service (after config changes)
-sudo launchctl bootout system/dev.querybird
+sudo launchctl unload /Library/LaunchDaemons/dev.querybird.plist
 sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
 ```
 
@@ -222,7 +251,9 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
 ## 🪟 Windows Installation
 
 ### Prerequisites
+
 1. **Install NSSM** (Non-Sucking Service Manager):
+
    - Download from [nssm.cc](https://nssm.cc/download)
    - Extract to `C:\nssm` and add to PATH
 
@@ -235,16 +266,20 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
 ### Installation Steps
+
 1. **Download and extract**:
+
    - Go to [Latest Release](https://github.com/trutohq/querybird/releases/latest)
    - Download `querybird-windows-x64-v<version>.zip` (or ARM64 version)
    - Extract the zip file and navigate to the folder:
+
    ```powershell
    Expand-Archive -Path "querybird-windows-x64-v<version>.zip" -DestinationPath "."
    cd querybird-windows-x64-v<version>
    ```
 
 2. **Install binary**:
+
    ```powershell
    # Create directories
    New-Item -ItemType Directory -Force -Path 'C:\Program Files\QueryBird'
@@ -259,9 +294,11 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
 3. **Setup PostgreSQL** (interactive configuration):
+
    ```powershell
    & 'C:\Program Files\QueryBird\querybird.exe' init-postgres
    ```
+
    📚 **For detailed configuration options, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 4. **Install as Windows service**:
@@ -270,6 +307,7 @@ sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
 ### Service Management
+
 ```powershell
 # Start service
 nssm start QueryBird
@@ -278,7 +316,7 @@ Start-Service QueryBird
 
 # Stop service
 nssm stop QueryBird
-# OR  
+# OR
 Stop-Service QueryBird
 
 # Check service status
@@ -313,9 +351,11 @@ This will interactively set up your database connection and create sample job co
 ### Core Commands
 
 #### `querybird start [options]`
+
 Start the job scheduler and watch configs
 
 **Options:**
+
 - `--encryption-key <key>` - Encryption key for file-based secrets
 - `--max-concurrent <num>` - Max concurrent jobs (default: 10)
 - `--log-level <level>` - Log level: debug, info, warn, error (default: info)
@@ -323,6 +363,7 @@ Start the job scheduler and watch configs
 - `--no-watch-secrets` - Disable hot reloading of secrets file
 
 **Examples:**
+
 ```bash
 # Start with default settings (secrets hot reloading enabled)
 querybird start
@@ -338,14 +379,17 @@ QB_CONFIG_DIR=/opt/querybird querybird start
 ```
 
 #### `querybird run-once [options]`
+
 Execute a single job once and exit
 
 **Options:**
+
 - `--job-id <id>` - Job ID to execute (required)
 - `--encryption-key <key>` - Encryption key for file-based secrets
 - `--log-level <level>` - Log level: debug, info, warn, error (default: info)
 
 **Examples:**
+
 ```bash
 # Run a specific job once
 querybird run-once --job-id my-daily-export
@@ -355,13 +399,16 @@ querybird run-once --job-id my-job --log-level debug
 ```
 
 #### `querybird update [action] [version]`
+
 Check for updates or install new version
 
 **Arguments:**
+
 - `action` - Update action: `check` or `install`
 - `version` - Specific version to install (optional)
 
 **Examples:**
+
 ```bash
 # Check for available updates
 querybird update check
@@ -376,18 +423,22 @@ querybird update install v1.2.3
 ### Setup Commands
 
 #### `querybird init-postgres [options]`
+
 Interactive setup for PostgreSQL data extraction job
 
 **Options:**
+
 - `--encryption-key <key>` - Encryption key for file-based secrets
 
 **What it does:**
+
 - Prompts for job configuration (ID, name, schedule)
 - Collects database connection details
 - Sets up Balkan ID integration (optional)
 - Generates config and secrets files
 
 **Example:**
+
 ```bash
 querybird init-postgres
 ```
@@ -395,12 +446,15 @@ querybird init-postgres
 📚 **For detailed configuration examples and advanced setup, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 #### `querybird init-mysql [options]`
+
 Interactive setup for MySQL data extraction job
 
 **Options:**
+
 - `--encryption-key <key>` - Encryption key for file-based secrets
 
 **Example:**
+
 ```bash
 querybird init-mysql
 ```
@@ -408,14 +462,17 @@ querybird init-mysql
 📚 **For detailed configuration examples and advanced setup, see [DOCUMENTATION.md](DOCUMENTATION.md#configuration)**
 
 #### `querybird config-postgres [options]`
+
 Generate PostgreSQL config from existing secrets
 
 **Options:**
+
 - `--job-id <id>` - Job ID (must match existing secrets key)
 - `--encryption-key <key>` - Encryption key for file-based secrets
 - `--secrets-file <path>` - Path to external secrets file to import from
 
 **Examples:**
+
 ```bash
 # Generate config from main secrets file
 querybird config-postgres --job-id existing-job
@@ -427,14 +484,17 @@ querybird config-postgres --job-id my-job --secrets-file /path/to/external-secre
 ```
 
 #### `querybird config-mysql [options]`
+
 Generate MySQL config from existing secrets
 
 **Options:**
+
 - `--job-id <id>` - Job ID (must match existing secrets key)
 - `--encryption-key <key>` - Encryption key for file-based secrets
 - `--secrets-file <path>` - Path to external secrets file to import from
 
 **Examples:**
+
 ```bash
 # Generate config from main secrets file
 querybird config-mysql --job-id existing-job
@@ -448,9 +508,11 @@ querybird config-mysql --job-id my-job --secrets-file /path/to/external-secrets.
 ### Secrets Management
 
 #### `querybird secrets`
+
 Manage encrypted secrets
 
 **Sub-commands:**
+
 - `wizard` - Interactive setup wizard for secrets
 - `set` - Store a secret at the specified path
 - `get` - Retrieve a secret value
@@ -460,6 +522,7 @@ Manage encrypted secrets
 - `webhooks` - Interactive webhooks setup
 
 **Examples:**
+
 ```bash
 # Interactive secrets wizard
 querybird secrets wizard
@@ -483,6 +546,7 @@ querybird secrets list
 ### Directory Structure
 
 QueryBird uses the following directory structure:
+
 ```
 ~/.querybird/               # Base directory (configurable)
 ├── configs/               # Job configuration files (.yml, .yaml, .json)
@@ -497,11 +561,13 @@ QueryBird uses the following directory structure:
 QueryBird supports hot reloading for both configuration and secrets files:
 
 **Config Hot Reloading** (always enabled):
+
 - Monitors `configs/` directory for `.yml`, `.yaml`, `.json` files
 - Automatically reschedules jobs when configs change
 - Handles file creation, modification, and deletion
 
 **Secrets Hot Reloading** (enabled by default):
+
 - Monitors `secrets/secrets.json` for changes
 - Automatically reloads secrets when file is modified
 - Closes existing database connections to force recreation with new credentials
@@ -511,11 +577,13 @@ QueryBird supports hot reloading for both configuration and secrets files:
 📚 **For secrets management commands and examples, see [SECRETS.md](SECRETS.md)**
 
 **Benefits:**
+
 - No service restart required for config changes
 - No service restart required for secrets updates (password changes, API key rotation)
 - Graceful handling of connection pool updates
 
 **Safety Features:**
+
 - 500ms debounce to prevent excessive reloads during rapid file changes
 - Atomic reload ensures secrets are validated before replacing cache
 - Connection pool management prevents credential mismatch
@@ -528,41 +596,46 @@ QueryBird supports hot reloading for both configuration and secrets files:
 **Issue**: `sudo launchctl load` fails with "Input/output error"
 
 **Solutions**:
+
 1. **Check if Bun is available system-wide**:
+
    ```bash
    sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
    ```
 
-2. **If the service is already loaded**, unload first:
+2. **Fix file permissions** (most common issue):
+
    ```bash
-   sudo launchctl bootout system/dev.querybird
+   sudo chown root:wheel /Library/LaunchDaemons/dev.querybird.plist
+   sudo chmod 644 /Library/LaunchDaemons/dev.querybird.plist
    sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
-3. **Fix PATH issues** by editing `/Library/LaunchDaemons/dev.querybird.plist`:
-   ```xml
-   <key>EnvironmentVariables</key>
-   <dict>
-       <key>PATH</key>
-       <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-   </dict>
+3. **If the service is already loaded**, unload first:
+
+   ```bash
+   sudo launchctl unload /Library/LaunchDaemons/dev.querybird.plist
+   sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
 4. **Check service status**:
+
    ```bash
-   launchctl print system/dev.querybird
+   sudo launchctl print system/dev.querybird
    ```
 
 5. **View error logs**:
+
    ```bash
-   cat /opt/querybird/logs/querybird.error.log
+   cat ~/.querybird/logs/querybird.error.log
    ```
 
 ### Common Error Messages
 
 - **"env: bun: No such file or directory"**: Install Bun and create system-wide symlink (see step 1 above)
-- **"Bootstrap failed: 5: Input/output error"**: Service may already be loaded, try unloading first
-- **"last exit code = 127"**: Command not found - PATH issue (see step 3 above)
+- **"Bootstrap failed: 5: Input/output error"**: File permission issue (see step 2 above)
+- **"Bad request. Could not find service"**: Service not loaded, check permissions and reload
+- **"last exit code = 127"**: Command not found - PATH issue (see step 1 above)
 
 ## 🔄 Updating QueryBird
 
@@ -571,37 +644,43 @@ QueryBird supports hot reloading for both configuration and secrets files:
 The install script is designed to safely update QueryBird without affecting your existing configurations or secrets.
 
 **Update Command:**
+
 ```bash
 curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash /dev/stdin
 ```
 
 **What the update preserves:**
+
 - ✅ Existing configurations in `~/.querybird/configs/`
 - ✅ Existing secrets in `~/.querybird/secrets/`
 - ✅ Directory structure and permissions
 - ✅ Service configuration
+- ✅ **Automatic permission fixes** for macOS LaunchDaemon
 
 **Update Process:**
 
 1. **Stop the service** (if running):
+
    ```bash
    # macOS
    sudo launchctl stop dev.querybird
-   
+
    # Linux
    sudo systemctl stop querybird
    ```
 
 2. **Run the install script**:
+
    ```bash
    curl -fsSL https://github.com/trutohq/querybird/releases/latest/download/install.sh | sudo bash /dev/stdin
    ```
 
 3. **Start the service**:
+
    ```bash
    # macOS
    sudo launchctl start dev.querybird
-   
+
    # Linux
    sudo systemctl start querybird
    ```
