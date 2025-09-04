@@ -39,6 +39,7 @@ interface EncryptedFile {
 export class ImprovedSecretsManager {
   private cache: SecretsConfig | null = null;
   private encryptionKey: Buffer | null = null;
+  private changeCallbacks: Array<() => void> = [];
 
   constructor(
     private secretsFile: string = './secrets/secrets.json',
@@ -275,6 +276,64 @@ export class ImprovedSecretsManager {
   }
 
   clearCache(): void {
+    this.cache = null;
+  }
+
+  /**
+   * Add a callback to be invoked when secrets are reloaded
+   */
+  onSecretsChange(callback: () => void): void {
+    this.changeCallbacks.push(callback);
+  }
+
+  /**
+   * Remove a callback
+   */
+  removeChangeCallback(callback: () => void): void {
+    const index = this.changeCallbacks.indexOf(callback);
+    if (index > -1) {
+      this.changeCallbacks.splice(index, 1);
+    }
+  }
+
+  /**
+   * Force reload secrets from disk, validate them, and notify callbacks
+   * Uses atomic reload pattern: load new secrets first, then replace cache
+   */
+  async reloadSecrets(): Promise<void> {
+    const oldCache = this.cache;
+    
+    try {
+      // Temporarily clear cache to force reload from disk
+      this.cache = null;
+      
+      // Load new secrets (this will validate JSON structure)
+      const newSecrets = await this.loadSecrets();
+      
+      // If we get here, the new secrets are valid
+      // The loadSecrets() call above already set this.cache to newSecrets
+      
+      // Notify all registered callbacks
+      this.changeCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          console.error('Error in secrets change callback:', error);
+        }
+      });
+      
+    } catch (error) {
+      // Restore old cache if reload failed
+      this.cache = oldCache;
+      throw new Error(`Failed to reload secrets: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Invalidate cache and trigger reload
+   * This is the method that should be called by the SecretsWatcher
+   */
+  invalidateCache(): void {
     this.cache = null;
   }
 }

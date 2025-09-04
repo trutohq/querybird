@@ -4,7 +4,8 @@ Single-instance job scheduler that runs database queries or HTTP calls, transfor
 
 - Database Support: PostgreSQL, MySQL
 - Cron-based scheduling
-- Secrets management
+- Secrets management with hot reloading
+- Config hot reloading
 
 Full docs: see [DOCUMENTATION.md](DOCUMENTATION.md).
 
@@ -301,47 +302,216 @@ querybird init-postgres
 
 This will interactively set up your database connection and create sample job configurations.
 
+📚 **For database connection templates and examples, see [SECRETS.md](SECRETS.md)**
+
 ## 📋 Commands
 
-### `querybird start`
+### Core Commands
 
-Starts the QueryBird job scheduler daemon that monitors configuration files and executes scheduled database queries or HTTP calls.
-
-**Usage:**
-```bash
-querybird start [options]
-```
+#### `querybird start [options]`
+Start the job scheduler and watch configs
 
 **Options:**
-- `--encryption-key <key>` - Encryption key for file-based secrets (optional)
-- `--max-concurrent <num>` - Maximum number of concurrent jobs (default: 10)
+- `--encryption-key <key>` - Encryption key for file-based secrets
+- `--max-concurrent <num>` - Max concurrent jobs (default: 10)
 - `--log-level <level>` - Log level: debug, info, warn, error (default: info)
-
-**What it does:**
-1. **Configuration Management**: Automatically detects QueryBird paths using `QB_CONFIG_DIR` environment variable or defaults to `~/.querybird/`
-2. **Directory Setup**: Creates necessary directories (configs, secrets, watermarks, outputs) if they don't exist
-3. **Config Watching**: Monitors the configs directory for `.yml`, `.yaml`, and `.json` files containing job definitions
-4. **Job Scheduling**: Uses cron expressions to schedule database queries and HTTP calls
-5. **Concurrent Execution**: Manages multiple jobs simultaneously (configurable limit)
-6. **Graceful Shutdown**: Handles SIGTERM and SIGINT signals for clean shutdown
-
-**Environment Variables:**
-- `QB_CONFIG_DIR` - Base directory for QueryBird files (default: `~/.querybird/`)
+- `--watch-secrets` - Enable hot reloading of secrets file (default: enabled)
+- `--no-watch-secrets` - Disable hot reloading of secrets file
 
 **Examples:**
 ```bash
-# Start with default settings
+# Start with default settings (secrets hot reloading enabled)
 querybird start
 
 # Start with debug logging and custom concurrency
 querybird start --log-level debug --max-concurrent 5
 
-# Start with custom encryption key
-querybird start --encryption-key "your-secret-key"
+# Start without secrets hot reloading
+querybird start --no-watch-secrets
 
 # Start with custom config directory
 QB_CONFIG_DIR=/opt/querybird querybird start
 ```
+
+#### `querybird run-once [options]`
+Execute a single job once and exit
+
+**Options:**
+- `--job-id <id>` - Job ID to execute (required)
+- `--encryption-key <key>` - Encryption key for file-based secrets
+- `--log-level <level>` - Log level: debug, info, warn, error (default: info)
+
+**Examples:**
+```bash
+# Run a specific job once
+querybird run-once --job-id my-daily-export
+
+# Run with debug logging
+querybird run-once --job-id my-job --log-level debug
+```
+
+#### `querybird update [action] [version]`
+Check for updates or install new version
+
+**Arguments:**
+- `action` - Update action: `check` or `install`
+- `version` - Specific version to install (optional)
+
+**Examples:**
+```bash
+# Check for available updates
+querybird update check
+
+# Install latest version
+querybird update install
+
+# Install specific version
+querybird update install v1.2.3
+```
+
+### Setup Commands
+
+#### `querybird init-postgres [options]`
+Interactive setup for PostgreSQL data extraction job
+
+**Options:**
+- `--encryption-key <key>` - Encryption key for file-based secrets
+
+**What it does:**
+- Prompts for job configuration (ID, name, schedule)
+- Collects database connection details
+- Sets up Balkan ID integration (optional)
+- Generates config and secrets files
+
+**Example:**
+```bash
+querybird init-postgres
+```
+
+#### `querybird init-mysql [options]`
+Interactive setup for MySQL data extraction job
+
+**Options:**
+- `--encryption-key <key>` - Encryption key for file-based secrets
+
+**Example:**
+```bash
+querybird init-mysql
+```
+
+#### `querybird config-postgres [options]`
+Generate PostgreSQL config from existing secrets
+
+**Options:**
+- `--job-id <id>` - Job ID (must match existing secrets key)
+- `--encryption-key <key>` - Encryption key for file-based secrets
+- `--secrets-file <path>` - Path to external secrets file to import from
+
+**Examples:**
+```bash
+# Generate config from main secrets file
+querybird config-postgres --job-id existing-job
+
+# Import secrets from external file and generate config
+querybird config-postgres --job-id my-job --secrets-file /path/to/external-secrets.json
+
+📚 **For external secrets file templates, see [SECRETS.md](SECRETS.md)**
+```
+
+#### `querybird config-mysql [options]`
+Generate MySQL config from existing secrets
+
+**Options:**
+- `--job-id <id>` - Job ID (must match existing secrets key)
+- `--encryption-key <key>` - Encryption key for file-based secrets
+- `--secrets-file <path>` - Path to external secrets file to import from
+
+**Examples:**
+```bash
+# Generate config from main secrets file
+querybird config-mysql --job-id existing-job
+
+# Import secrets from external file and generate config
+querybird config-mysql --job-id my-job --secrets-file /path/to/external-secrets.json
+
+📚 **For external secrets file templates, see [SECRETS.md](SECRETS.md)**
+```
+
+### Secrets Management
+
+#### `querybird secrets`
+Manage encrypted secrets
+
+**Sub-commands:**
+- `wizard` - Interactive setup wizard for secrets
+- `set` - Store a secret at the specified path
+- `get` - Retrieve a secret value
+- `list` - List all available secret paths
+- `database` - Interactive database secrets setup
+- `api-keys` - Interactive API keys setup
+- `webhooks` - Interactive webhooks setup
+
+**Examples:**
+```bash
+# Interactive secrets wizard
+querybird secrets wizard
+
+# Set a specific secret
+querybird secrets set --path "myapp.api_key" --value "secret123"
+
+# Get a secret value
+querybird secrets get --path "myapp.api_key"
+
+# List all secret paths
+querybird secrets list
+```
+
+📚 **For detailed secrets management documentation, templates, and examples, see [SECRETS.md](SECRETS.md)**
+
+### Environment Variables
+
+- `QB_CONFIG_DIR` - Base directory for QueryBird files (default: `~/.querybird/`)
+
+### Directory Structure
+
+QueryBird uses the following directory structure:
+```
+~/.querybird/               # Base directory (configurable)
+├── configs/               # Job configuration files (.yml, .yaml, .json)
+├── secrets/               # Encrypted secrets storage
+├── watermarks/            # Job execution tracking
+├── outputs/               # Local file outputs
+└── logs/                  # Application logs
+```
+
+### Hot Reloading
+
+QueryBird supports hot reloading for both configuration and secrets files:
+
+**Config Hot Reloading** (always enabled):
+- Monitors `configs/` directory for `.yml`, `.yaml`, `.json` files
+- Automatically reschedules jobs when configs change
+- Handles file creation, modification, and deletion
+
+**Secrets Hot Reloading** (enabled by default):
+- Monitors `secrets/secrets.json` for changes
+- Automatically reloads secrets when file is modified
+- Closes existing database connections to force recreation with new credentials
+- Validates secrets before applying changes (atomic reload)
+- Can be disabled with `--no-watch-secrets` flag
+
+📚 **For secrets management commands and examples, see [SECRETS.md](SECRETS.md)**
+
+**Benefits:**
+- No service restart required for config changes
+- No service restart required for secrets updates (password changes, API key rotation)
+- Graceful handling of connection pool updates
+
+**Safety Features:**
+- 500ms debounce to prevent excessive reloads during rapid file changes
+- Atomic reload ensures secrets are validated before replacing cache
+- Connection pool management prevents credential mismatch
+- Error handling preserves service operation if reload fails
 
 ## Troubleshooting
 
@@ -437,8 +607,9 @@ The script only creates sample configurations if they don't already exist, ensur
 
 ---
 
-## Support
+## Documentation
 
-- 📖 [DOCUMENTATION.md](DOCUMENTATION.md)
-- 🐛 [Issues](https://github.com/trutohq/querybird/issues)
+- 📖 [DOCUMENTATION.md](DOCUMENTATION.md) - Complete feature documentation
+- 🔐 [SECRETS.md](SECRETS.md) - Secrets management guide with templates and examples
+- 🐛 [Issues](https://github.com/trutohq/querybird/issues) - Bug reports and feature requests
 - 📬 Security: eng@qtruto.one

@@ -141,4 +141,15 @@ export class DatabaseManager {
     
     this.logger.info('All database connections closed');
   }
+
+  /**
+   * Close all connections and clear the pool due to secrets change
+   * This forces recreation of connections with new credentials
+   */
+  async closeAllConnections(): Promise<void> {
+    if (this.connections.size > 0) {
+      this.logger.info('Closing all database connections due to secrets reload...');
+      await this.closeAll();
+    }
+  }
 }

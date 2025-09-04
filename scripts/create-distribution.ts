@@ -20,32 +20,32 @@ const platforms: PlatformArchive[] = [
   {
     name: 'querybird-linux-x64',
     binaryFile: 'querybird-linux-x64',
-    files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    files: ['install.sh', 'setup/setup-postgres.sh', 'setup/setup-mysql.sh', 'services/querybird.service'],
   },
   {
     name: 'querybird-linux-arm64',
     binaryFile: 'querybird-linux-arm64',
-    files: ['install.sh', 'setup/setup-postgres.sh', 'services/querybird.service'],
+    files: ['install.sh', 'setup/setup-postgres.sh', 'setup/setup-mysql.sh', 'services/querybird.service'],
   },
   {
     name: 'querybird-darwin-x64',
     binaryFile: 'querybird-darwin-x64',
-    files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    files: ['install.sh', 'setup/setup-postgres.sh', 'setup/setup-mysql.sh', 'services/dev.querybird.plist'],
   },
   {
     name: 'querybird-darwin-arm64',
     binaryFile: 'querybird-darwin-arm64',
-    files: ['install.sh', 'setup/setup-postgres.sh', 'services/dev.querybird.plist'],
+    files: ['install.sh', 'setup/setup-postgres.sh', 'setup/setup-mysql.sh', 'services/dev.querybird.plist'],
   },
   {
     name: 'querybird-windows-x64',
     binaryFile: 'querybird-windows-x64.exe',
-    files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
+    files: ['install.ps1', 'setup/setup-postgres.bat', 'setup/setup-mysql.bat', 'services/install-windows-service.bat'],
   },
   {
     name: 'querybird-windows-arm64',
     binaryFile: 'querybird-windows-arm64.exe',
-    files: ['install.ps1', 'setup/setup-postgres.bat', 'services/install-windows-service.bat'],
+    files: ['install.ps1', 'setup/setup-postgres.bat', 'setup/setup-mysql.bat', 'services/install-windows-service.bat'],
   },
 ];
 

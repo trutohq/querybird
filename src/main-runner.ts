@@ -5,6 +5,8 @@ import { ImprovedSecretsManager } from './utils/improved-secrets-manager';
 import { Logger, LogLevelName } from './utils/logger';
 import { handleUpdateCommand } from './utils/updater';
 import { PostgresSetup } from './utils/postgres-setup';
+import { MysqlSetup } from './utils/mysql-setup';
+import { ConfigFromSecrets } from './utils/config-from-secrets';
 import { getQueryBirdPaths } from './utils/path-resolver';
 import { mkdir, access } from 'fs/promises';
 import { join } from 'path';
@@ -50,8 +52,10 @@ program
   .option('--encryption-key <key>', 'Encryption key for file-based secrets')
   .option('--max-concurrent <num>', 'Max concurrent jobs', '10')
   .option('--log-level <level>', 'Log level (debug, info, warn, error)', 'info')
+  .option('--watch-secrets', 'Enable hot reloading of secrets file', true)
+  .option('--no-watch-secrets', 'Disable hot reloading of secrets file')
   .description('Start the job scheduler and watch configs')
-  .action(async (opts: { encryptionKey?: string; maxConcurrent: string; logLevel: LogLevelName }) => {
+  .action(async (opts: { encryptionKey?: string; maxConcurrent: string; logLevel: LogLevelName; watchSecrets: boolean }) => {
     const logger = new Logger(opts.logLevel);
 
     try {
@@ -72,6 +76,7 @@ program
         logger,
         encryptionPassword: opts.encryptionKey,
         maxConcurrentJobs: parseInt(opts.maxConcurrent, 10),
+        watchSecrets: opts.watchSecrets,
       });
 
       await runner.start();
@@ -181,6 +186,87 @@ program
       await setup.initializePostgres(paths.configs, paths.secrets);
     } catch (error) {
       logger.error('Setup failed:', { error: error instanceof Error ? error.message : String(error) });
+      process.exit(1);
+    }
+  });
+
+program
+  .command('init-mysql')
+  .option('--encryption-key <key>', 'Encryption key for file-based secrets')
+  .description('Interactive setup for MySQL data extraction job')
+  .action(async (opts: { encryptionKey?: string }) => {
+    const logger = new Logger();
+    try {
+      // Use consistent path resolution
+      const paths = getQueryBirdPaths();
+      logger.info(`🌍 Using CONFIG_DIR: ${paths.base}`);
+      logger.info(`📁 Config directory: ${paths.configs}`);
+      logger.info(`🔒 Secrets directory: ${paths.secrets}`);
+      // Ensure directories exist
+      await mkdir(paths.configs, { recursive: true });
+      await mkdir(paths.secrets, { recursive: true });
+      const setup = new MysqlSetup(paths.secretsFile, opts.encryptionKey, logger);
+      await setup.initializeMysql(paths.configs, paths.secrets);
+    } catch (error) {
+      logger.error('Setup failed:', { error: error instanceof Error ? error.message : String(error) });
+      process.exit(1);
+    }
+  });
+
+program
+  .command('config-postgres')
+  .requiredOption('--job-id <id>', 'Job ID (must match existing secrets key)')
+  .option('--encryption-key <key>', 'Encryption key for file-based secrets')
+  .option('--secrets-file <path>', 'Path to external secrets file to import from')
+  .description('Generate PostgreSQL config from existing secrets')
+  .action(async (opts: { jobId: string; encryptionKey?: string; secretsFile?: string }) => {
+    const logger = new Logger();
+
+    try {
+      const paths = getQueryBirdPaths();
+      logger.info(`🚀 QueryBird PostgreSQL Config Generator`);
+      logger.info(`====================================`);
+      logger.info(`🌍 Using CONFIG_DIR: ${paths.base}`);
+      logger.info(`📁 Config directory: ${paths.configs}`);
+      logger.info(`🔒 Secrets directory: ${paths.secrets}`);
+      logger.info(`📋 Job ID: ${opts.jobId}\n`);
+
+      await mkdir(paths.configs, { recursive: true });
+      await mkdir(paths.secrets, { recursive: true });
+
+      const generator = new ConfigFromSecrets(paths.secretsFile, opts.encryptionKey, logger);
+      await generator.generatePostgresConfig(paths.configs, opts.jobId, opts.secretsFile);
+    } catch (error) {
+      logger.error('Config generation failed:', { error: error instanceof Error ? error.message : String(error) });
+      process.exit(1);
+    }
+  });
+
+program
+  .command('config-mysql')
+  .requiredOption('--job-id <id>', 'Job ID (must match existing secrets key)')
+  .option('--encryption-key <key>', 'Encryption key for file-based secrets')
+  .option('--secrets-file <path>', 'Path to external secrets file to import from')
+  .description('Generate MySQL config from existing secrets')
+  .action(async (opts: { jobId: string; encryptionKey?: string; secretsFile?: string }) => {
+    const logger = new Logger();
+
+    try {
+      const paths = getQueryBirdPaths();
+      logger.info(`🚀 QueryBird MySQL Config Generator`);
+      logger.info(`=================================`);
+      logger.info(`🌍 Using CONFIG_DIR: ${paths.base}`);
+      logger.info(`📁 Config directory: ${paths.configs}`);
+      logger.info(`🔒 Secrets directory: ${paths.secrets}`);
+      logger.info(`📋 Job ID: ${opts.jobId}\n`);
+
+      await mkdir(paths.configs, { recursive: true });
+      await mkdir(paths.secrets, { recursive: true });
+
+      const generator = new ConfigFromSecrets(paths.secretsFile, opts.encryptionKey, logger);
+      await generator.generateMysqlConfig(paths.configs, opts.jobId, opts.secretsFile);
+    } catch (error) {
+      logger.error('Config generation failed:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
     }
   });

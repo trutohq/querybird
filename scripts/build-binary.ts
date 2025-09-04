@@ -282,9 +282,65 @@ echo 2. Start the service: set QB_CONFIG_DIR=%CONFIG_DIR% && querybird.exe start
 echo 3. Or install as Windows service: install-windows-service.bat
 `;
 
+  // MySQL setup script
+  const mysqlSetup = `#!/bin/bash
+# QueryBird MySQL Setup Script
+
+set -e
+
+CONFIG_DIR="\${CONFIG_DIR:-/opt/querybird}"
+
+echo "🔧 Setting up QueryBird MySQL configuration..."
+
+# Create directories
+mkdir -p "\${CONFIG_DIR}"/{configs,secrets,watermarks,outputs,logs}
+chmod 700 "\${CONFIG_DIR}/secrets"
+
+# Run init-mysql command using QB_CONFIG_DIR
+echo "📊 Initializing MySQL configuration..."
+QB_CONFIG_DIR="\${CONFIG_DIR}" querybird init-mysql
+
+echo "✅ MySQL setup complete!"
+echo "Next steps:"
+echo "1. Edit configuration files in \${CONFIG_DIR}/configs"
+echo "2. Start the service: QB_CONFIG_DIR=\${CONFIG_DIR} querybird start"
+echo "3. Or install as system service: sudo systemctl enable querybird"
+`;
+
+  // Windows MySQL setup script
+  const windowsMysqlSetup = `@echo off
+REM QueryBird MySQL Windows Setup Script
+
+set CONFIG_DIR=C:\\ProgramData\\QueryBird
+
+echo 🔧 Setting up QueryBird MySQL configuration...
+
+REM Create directories
+if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
+if not exist "%CONFIG_DIR%\\configs" mkdir "%CONFIG_DIR%\\configs"
+if not exist "%CONFIG_DIR%\\secrets" mkdir "%CONFIG_DIR%\\secrets"
+if not exist "%CONFIG_DIR%\\watermarks" mkdir "%CONFIG_DIR%\\watermarks"
+if not exist "%CONFIG_DIR%\\outputs" mkdir "%CONFIG_DIR%\\outputs"
+if not exist "%CONFIG_DIR%\\logs" mkdir "%CONFIG_DIR%\\logs"
+
+REM Run init-mysql command
+echo 📊 Initializing MySQL configuration...
+set QB_CONFIG_DIR=%CONFIG_DIR%
+querybird.exe init-mysql
+
+echo ✅ MySQL setup complete!
+echo Next steps:
+echo 1. Edit configuration files in %CONFIG_DIR%\\configs
+echo 2. Start the service: set QB_CONFIG_DIR=%CONFIG_DIR% && querybird.exe start
+echo 3. Or install as Windows service: install-windows-service.bat
+`;
+
   await writeFile(join(scriptsDir, 'setup-postgres.sh'), postgresSetup);
   await writeFile(join(scriptsDir, 'setup-postgres.bat'), windowsSetup);
+  await writeFile(join(scriptsDir, 'setup-mysql.sh'), mysqlSetup);
+  await writeFile(join(scriptsDir, 'setup-mysql.bat'), windowsMysqlSetup);
   await chmod(join(scriptsDir, 'setup-postgres.sh'), 0o755);
+  await chmod(join(scriptsDir, 'setup-mysql.sh'), 0o755);
 
   console.log('✓ Created setup scripts');
 }

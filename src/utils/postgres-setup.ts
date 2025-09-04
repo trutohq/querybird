@@ -86,10 +86,20 @@ export class PostgresSetup {
 
     if (hasBalkan) {
       console.log('\n🔑 Balkan ID Configuration');
-      const keyId = await this.promptForInput('Balkan API Key ID', 'string', true);
-      const keySecret = await this.promptForInput('Balkan API Key Secret', 'password', true);
+      
+      const globalSecrets = await this.getGlobalBalkanSecrets();
+      if (!globalSecrets.balkan_key_id || !globalSecrets.balkan_key_secret) {
+        console.log('Global Balkan API credentials not found. Please configure them:');
+        const keyId = await this.promptForInput('Balkan API Key ID', 'string', true);
+        const keySecret = await this.promptForInput('Balkan API Key Secret', 'password', true);
+        await this.setGlobalBalkanSecrets(keyId, keySecret);
+        console.log('✅ Global Balkan credentials saved');
+      } else {
+        console.log('✅ Using existing global Balkan credentials');
+      }
+      
       const integrationId = await this.promptForInput('Balkan Integration ID', 'string', true);
-      balkanApiKeys = { keyId, keySecret, integrationId };
+      balkanApiKeys = { keyId: '', keySecret: '', integrationId };
     }
 
     return {
@@ -121,7 +131,7 @@ export class PostgresSetup {
       const database = await this.promptForInput('Database name', 'string', true);
       const user = await this.promptForInput('Username', 'string', true);
       const password = await this.promptForInput('Password', 'password', true);
-      const region = await this.promptForInput('Region (optional)', 'string', false, 'default');
+      const region = await this.promptForInput('Region', 'string', true, 'default');
       const sslStr = await this.promptForInput('Enable SSL? (y/n)', 'boolean', false, 'y');
       const ssl = sslStr.toLowerCase().startsWith('y');
 
@@ -171,8 +181,8 @@ export class PostgresSetup {
         endpoint: 'https://app.balkan.id/api/rest/v0/entitlements/upload-url',
         method: 'POST',
         headers: {
-          'X-Api-Key-ID': `!secrets ${jobConfig.id}.api_keys.balkan_key_id`,
-          'X-Api-Key-Secret': `!secrets ${jobConfig.id}.api_keys.balkan_key_secret`,
+          'X-Api-Key-ID': `!secrets balkan.balkan_key_id`,
+          'X-Api-Key-Secret': `!secrets balkan.balkan_key_secret`,
         },
         body: {
           integrationId: `!secrets ${jobConfig.id}.api_keys.balkan_integration_id`,
@@ -245,54 +255,266 @@ export class PostgresSetup {
       // Multi-database transform using array format with conditional checks
       const transformParts = databases.map(
         (db) =>
-          `    (${db.name}.users ? ${db.name}.users.{
-      "Project": "${jobConfig.name}",
-      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity Type": "identity",
-      "Entity Source Type": "user",
-      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity Username": username,
-      "Entity Email": username,
-      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity - Has Access To Entity Type": "connection",
-      "Entity - Has Access To Source Type": "role",
-      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
-      "Entity - Has Access To Permission Value": "true",
-      "Entity Status": can_login ? "active" : "inactive",
-      "Entity First Name": $substringBefore(username, "."),
-      "Entity Last Name": $substringAfter(username, "."),
-      "Entity LastLoginTime": last_login_time,
-      "Entity LastPasswordChangedTime": last_password_changed_time,
-      "Entity MfaEnabled": "false"
-    } : [])`
+          `    (${db.name}.users ? ${db.name}.users[
+      {
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }
+    ] ~> $append(
+      is_superuser ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity", 
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Superuser::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "superuser-role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role", 
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_create_role ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user", 
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Create Role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "create-role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access", 
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_create_db ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region, 
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Create Db::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "create-db::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true", 
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_login ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username, 
+        "Entity - Has Access To Name": "Login::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "login::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."), 
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      !(is_superuser or can_create_role or can_create_db or can_login) ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Read::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "read::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role", 
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) : [])`
       );
 
       transform = `[\n${transformParts.join(',\n')}\n  ]`;
     } else {
       // Single database transform using array format with conditional check
       const db = databases[0];
-      transform = `[\n    (${db.name}.users ? ${db.name}.users.{
-      "Project": "${jobConfig.name}",
-      "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity Type": "identity",
-      "Entity Source Type": "user",
-      "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity Username": username,
-      "Entity Email": username,
-      "Entity - Has Access To Name": (is_superuser ? "Admin" : "User") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity - Has Access To Source ID": (is_superuser ? "admin-role-001" : "user-role-001") & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
-      "Entity - Has Access To Entity Type": "connection",
-      "Entity - Has Access To Source Type": "role",
-      "Entity - Has Access To Permission Name": is_superuser ? "admin" : "member",
-      "Entity - Has Access To Permission Value": "true",
-      "Entity Status": can_login ? "active" : "inactive",
-      "Entity First Name": $substringBefore(username, "."),
-      "Entity Last Name": $substringAfter(username, "."),
-      "Entity LastLoginTime": last_login_time,
-      "Entity LastPasswordChangedTime": last_password_changed_time,
-      "Entity MfaEnabled": "false"
-    } : [])
+      transform = `[\n    (${db.name}.users ? ${db.name}.users[
+      {
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }
+    ] ~> $append(
+      is_superuser ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity", 
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Superuser::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "superuser-role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role", 
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_create_role ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user", 
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Create Role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "create-role::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access", 
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_create_db ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region, 
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Create Db::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "create-db::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true", 
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      can_login ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username, 
+        "Entity - Has Access To Name": "Login::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "login::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role",
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": can_login ? "active" : "inactive",
+        "Entity First Name": $substringBefore(username, "."), 
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) ~> $append(
+      !(is_superuser or can_create_role or can_create_db or can_login) ? [{
+        "Project": "${jobConfig.name}",
+        "Entity Name": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Type": "identity",
+        "Entity Source Type": "user",
+        "Entity Source ID": username & "::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity Username": username,
+        "Entity Email": username,
+        "Entity - Has Access To Name": "Read::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Source ID": "read::" & %.connection_info.db_name & "::" & %.connection_info.region,
+        "Entity - Has Access To Entity Type": "connection",
+        "Entity - Has Access To Source Type": "role", 
+        "Entity - Has Access To Permission Name": "access",
+        "Entity - Has Access To Permission Value": "true",
+        "Entity Status": "inactive",
+        "Entity First Name": $substringBefore(username, "."),
+        "Entity Last Name": $substringAfter(username, "."),
+        "Entity LastLoginTime": last_login_time,
+        "Entity LastPasswordChangedTime": last_password_changed_time,
+        "Entity MfaEnabled": "false"
+      }] : []
+    ) : [])
   ]`;
     }
 
@@ -363,8 +585,6 @@ export class PostgresSetup {
     // Add API keys under job_id.api_keys
     if (jobConfig.balkanApiKeys) {
       if (!jobSecrets.api_keys) jobSecrets.api_keys = {};
-      jobSecrets.api_keys.balkan_key_id = jobConfig.balkanApiKeys.keyId;
-      jobSecrets.api_keys.balkan_key_secret = jobConfig.balkanApiKeys.keySecret;
       jobSecrets.api_keys.balkan_integration_id = jobConfig.balkanApiKeys.integrationId;
     }
 
@@ -412,14 +632,25 @@ export class PostgresSetup {
 
   private async promptForConfirmation(prompt: string, defaultValue: boolean = false): Promise<boolean> {
     const defaultText = defaultValue ? ' (Y/n)' : ' (y/N)';
-    const input = await this.readInput(`${prompt}${defaultText}: `);
-    const value = input.trim().toLowerCase();
+    
+    while (true) {
+      const input = await this.readInput(`${prompt}${defaultText}: `);
+      const value = input.trim().toLowerCase();
 
-    if (!value) {
-      return defaultValue;
+      if (!value) {
+        return defaultValue;
+      }
+
+      if (value === 'y' || value === 'yes') {
+        return true;
+      }
+
+      if (value === 'n' || value === 'no') {
+        return false;
+      }
+
+      console.log('❌ Please enter "y" for yes or "n" for no.');
     }
-
-    return value.startsWith('y');
   }
 
   private isValidUrl(url: string): boolean {
@@ -447,5 +678,38 @@ export class PostgresSetup {
 
       stdin.on('data', onData);
     });
+  }
+
+  private async getGlobalBalkanSecrets(): Promise<{ balkan_key_id?: string; balkan_key_secret?: string }> {
+    try {
+      const secrets = await this.secretsManager.loadSecrets();
+      const balkanSecrets = (secrets as any).balkan || {};
+      return balkanSecrets;
+    } catch {
+      return {};
+    }
+  }
+
+  private async setGlobalBalkanSecrets(keyId: string, keySecret: string): Promise<void> {
+    let secrets: SecretsConfig;
+    try {
+      secrets = await this.secretsManager.loadSecrets();
+    } catch {
+      secrets = {
+        database: {},
+        api_keys: {},
+        webhooks: {},
+        config: {},
+      };
+    }
+
+    if (!(secrets as any).balkan) {
+      (secrets as any).balkan = {};
+    }
+
+    (secrets as any).balkan.balkan_key_id = keyId;
+    (secrets as any).balkan.balkan_key_secret = keySecret;
+
+    await this.secretsManager.saveSecrets(secrets);
   }
 }

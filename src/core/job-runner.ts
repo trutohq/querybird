@@ -2,6 +2,7 @@ import { Cron } from 'croner';
 import jsonata from 'jsonata';
 import { Job, Input, Output } from '../types/job-schema';
 import { ConfigWatcher } from './config-watcher';
+import { SecretsWatcher } from './secrets-watcher';
 import { ImprovedSecretsManager } from '../utils/improved-secrets-manager';
 import { Logger } from '../utils/logger';
 import { DatabaseManager } from './database-manager';
@@ -13,6 +14,7 @@ export interface JobRunnerOptions {
   logger?: Logger;
   encryptionPassword?: string;
   maxConcurrentJobs?: number;
+  watchSecrets?: boolean;
 }
 
 export interface JobExecution {
@@ -26,6 +28,7 @@ export interface JobExecution {
 
 export class JobRunner {
   private configWatcher: ConfigWatcher;
+  private secretsWatcher: SecretsWatcher | null = null;
   private secretsManager: ImprovedSecretsManager;
   private dbManager: DatabaseManager;
   private outputManager: OutputManager;
@@ -33,10 +36,12 @@ export class JobRunner {
   private scheduledJobs = new Map<string, Cron>();
   private runningJobs = new Map<string, JobExecution>();
   private maxConcurrentJobs: number;
+  private watchSecrets: boolean;
 
   constructor(options: JobRunnerOptions) {
     this.logger = options.logger || new Logger();
     this.maxConcurrentJobs = options.maxConcurrentJobs || 10;
+    this.watchSecrets = options.watchSecrets ?? true; // Default to enabled
 
     this.secretsManager = new ImprovedSecretsManager(options.secretsFile, options.encryptionPassword);
 
@@ -49,10 +54,25 @@ export class JobRunner {
       onJobChange: this.handleJobsChange.bind(this),
       onError: this.handleConfigError.bind(this),
     });
+
+    // Initialize secrets watcher if enabled
+    if (this.watchSecrets) {
+      this.secretsWatcher = new SecretsWatcher({
+        secretsFile: options.secretsFile,
+        logger: this.logger,
+        onSecretsChange: this.handleSecretsChange.bind(this),
+        onError: this.handleSecretsError.bind(this),
+      });
+    }
   }
 
   async start(): Promise<void> {
     await this.configWatcher.start();
+    
+    if (this.secretsWatcher) {
+      await this.secretsWatcher.start();
+    }
+    
     this.logger.info('Job runner started');
   }
 
@@ -359,6 +379,26 @@ export class JobRunner {
     this.logger.error('Config watcher error:', { error: error instanceof Error ? error.message : String(error) });
   }
 
+  private async handleSecretsChange(): Promise<void> {
+    try {
+      this.logger.info('Secrets changed, reloading and invalidating connections...');
+      
+      // Reload secrets with validation
+      await this.secretsManager.reloadSecrets();
+      
+      // Close all database connections to force recreation with new credentials
+      await this.dbManager.closeAllConnections();
+      
+      this.logger.info('Secrets reloaded successfully, connections will be recreated as needed');
+    } catch (error) {
+      this.logger.error('Failed to reload secrets:', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  private handleSecretsError(error: Error): void {
+    this.logger.error('Secrets watcher error:', { error: error instanceof Error ? error.message : String(error) });
+  }
+
   async stop(): Promise<void> {
     // Stop all scheduled jobs
     for (const cronJob of this.scheduledJobs.values()) {
@@ -379,6 +419,11 @@ export class JobRunner {
     }
 
     this.configWatcher.stop();
+    
+    if (this.secretsWatcher) {
+      this.secretsWatcher.stop();
+    }
+    
     await this.dbManager.closeAll();
 
     this.logger.info('Job runner stopped');
