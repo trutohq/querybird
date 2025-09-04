@@ -69,6 +69,12 @@ This script will:
    sudo systemctl status querybird
    ```
 
+   **💡 If you get "Could not find service" on macOS, the service may not be loaded. Load it with:**
+
+   ```bash
+   sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
+   ```
+
 **To install to a custom directory:**
 
 ```bash
@@ -226,7 +232,7 @@ sudo launchctl start dev.querybird
 # Stop service
 sudo launchctl stop dev.querybird
 
-# Check if service is loaded
+# Check service status
 sudo launchctl print system/dev.querybird
 
 # View standard logs
@@ -235,8 +241,14 @@ cat ~/.querybird/logs/querybird.log
 # View error logs
 cat ~/.querybird/logs/querybird.error.log
 
+# Follow logs in real-time
+tail -f ~/.querybird/logs/querybird.log
+
 # Follow error logs in real-time
 tail -f ~/.querybird/logs/querybird.error.log
+
+# Load service (if not loaded)
+sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
 
 # Unload service (to disable)
 sudo launchctl unload /Library/LaunchDaemons/dev.querybird.plist
@@ -593,17 +605,23 @@ QueryBird supports hot reloading for both configuration and secrets files:
 
 ### macOS LaunchDaemon Issues
 
-**Issue**: `sudo launchctl load` fails with "Input/output error"
+**Issue**: `sudo launchctl print system/dev.querybird` returns "Could not find service"
 
 **Solutions**:
 
-1. **Check if Bun is available system-wide**:
+1. **Load the service** (most common solution):
+
+   ```bash
+   sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
+   ```
+
+2. **Check if Bun is available system-wide**:
 
    ```bash
    sudo ln -sf ~/.bun/bin/bun /usr/local/bin/bun
    ```
 
-2. **Fix file permissions** (most common issue):
+3. **Fix file permissions** (if loading fails):
 
    ```bash
    sudo chown root:wheel /Library/LaunchDaemons/dev.querybird.plist
@@ -611,20 +629,20 @@ QueryBird supports hot reloading for both configuration and secrets files:
    sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
-3. **If the service is already loaded**, unload first:
+4. **If the service is already loaded**, unload first:
 
    ```bash
    sudo launchctl unload /Library/LaunchDaemons/dev.querybird.plist
    sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist
    ```
 
-4. **Check service status**:
+5. **Check service status**:
 
    ```bash
    sudo launchctl print system/dev.querybird
    ```
 
-5. **View error logs**:
+6. **View error logs**:
 
    ```bash
    cat ~/.querybird/logs/querybird.error.log
@@ -632,10 +650,10 @@ QueryBird supports hot reloading for both configuration and secrets files:
 
 ### Common Error Messages
 
-- **"env: bun: No such file or directory"**: Install Bun and create system-wide symlink (see step 1 above)
-- **"Bootstrap failed: 5: Input/output error"**: File permission issue (see step 2 above)
-- **"Bad request. Could not find service"**: Service not loaded, check permissions and reload
-- **"last exit code = 127"**: Command not found - PATH issue (see step 1 above)
+- **"Could not find service"**: Service not loaded, run `sudo launchctl load /Library/LaunchDaemons/dev.querybird.plist`
+- **"env: bun: No such file or directory"**: Install Bun and create system-wide symlink (see step 2 above)
+- **"Bootstrap failed: 5: Input/output error"**: File permission issue (see step 3 above)
+- **"last exit code = 127"**: Command not found - PATH issue (see step 2 above)
 
 ## 🔄 Updating QueryBird
 
