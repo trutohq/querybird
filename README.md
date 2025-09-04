@@ -67,7 +67,11 @@ This script will:
 
    # Linux - check service status
    sudo systemctl status querybird
+
+   # View Real time logs 
+   tail -f ~/.querybird/logs/querybird.log
    ```
+
 
    **💡 If you get "Could not find service" on macOS, the service may not be loaded. Load it with:**
 
