@@ -20,7 +20,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -215,4 +215,3 @@ jobs:
           body_path: release_body.md
           draft: false
           prerelease: false
-          make_latest: true
