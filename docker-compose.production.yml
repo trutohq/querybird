@@ -52,6 +52,7 @@ services:
 
 networks:
   querybird-network:
+    name: querybird
     driver: bridge
 # Production deployment notes:
 #

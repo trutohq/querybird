@@ -11,7 +11,7 @@ Single-instance job scheduler that runs database queries or HTTP calls, transfor
 
 ## 🚀 Quick Start
 
-Get QueryBird running in production in 3 steps:
+Get QueryBird running in production in 4 steps:
 
 ### 1. Download Production Setup
 
@@ -23,7 +23,23 @@ curl -fsSL https://raw.githubusercontent.com/trutohq/querybird/main/docker-compo
 docker-compose up -d
 ```
 
-### 2. Create Secrets Template
+### 2. Connect to Existing Database Networks (If Applicable)
+
+If you have existing database containers running, connect them to the QueryBird network:
+
+```bash
+# Connect your database containers to QueryBird network
+docker network connect querybird <your-database-container-name>
+
+# Example: Connect PostgreSQL containers
+docker network connect querybird my-postgres-primary
+docker network connect querybird my-postgres-staging
+
+# Verify connectivity
+docker exec querybird ping -c 2 <your-database-container-name>
+```
+
+### 3. Create Secrets Template
 
 ```bash
 # Create your secrets file
@@ -50,7 +66,7 @@ cat > production-secrets.json << 'EOF'
 EOF
 ```
 
-### 3. Generate Job Configuration
+### 4. Generate Job Configuration
 
 ```bash
 # Generate PostgreSQL job from external secrets
