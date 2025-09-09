@@ -9,6 +9,13 @@ QB_CONFIG_DIR=${QB_CONFIG_DIR:-/app/.querybird}
 # Ensure directories exist
 mkdir -p "${QB_CONFIG_DIR}/configs" "${QB_CONFIG_DIR}/secrets" "${QB_CONFIG_DIR}/logs"
 
+# Create empty secrets file if it doesn't exist
+SECRETS_FILE="${QB_CONFIG_DIR}/secrets/secrets.json"
+if [ ! -f "$SECRETS_FILE" ]; then
+    echo '{}' > "$SECRETS_FILE"
+    echo "📝 Created empty secrets file at $SECRETS_FILE"
+fi
+
 # Set proper permissions (in case mounted volumes have different ownership)
 if [ "$(id -u)" = "0" ]; then
     # If running as root, fix permissions and switch to querybird user
