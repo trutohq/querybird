@@ -86,7 +86,7 @@ export class MysqlSetup {
 
     if (hasBalkan) {
       console.log('\n🔑 Balkan ID Configuration');
-      
+
       const globalSecrets = await this.getGlobalBalkanSecrets();
       if (!globalSecrets.balkan_key_id || !globalSecrets.balkan_key_secret) {
         console.log('Global Balkan API credentials not found. Please configure them:');
@@ -97,7 +97,7 @@ export class MysqlSetup {
       } else {
         console.log('✅ Using existing global Balkan credentials');
       }
-      
+
       const integrationId = await this.promptForInput('Balkan Integration ID', 'string', true);
       balkanApiKeys = { keyId: '', keySecret: '', integrationId };
     }
@@ -301,109 +301,164 @@ export class MysqlSetup {
       };
     }
 
-    // Build transform - handle single vs multiple databases using new array format
+    // Build transform using the correct Balkan ID transformation logic for MySQL
+    const generateTransformForDb = (dbName: string) =>
+      `(${dbName}.users ? ${dbName}.users[
+        {
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }
+      ] ~> $append(
+        has_super_priv ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "Superuser::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "superuser-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) ~> $append(
+        has_create_user_priv ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "Create User::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "create-user-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) ~> $append(
+        has_grant_priv ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "Grant::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "grant-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) ~> $append(
+        (has_create_priv or has_insert_priv or has_update_priv or has_delete_priv or has_drop_priv) ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "Write::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "write-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) ~> $append(
+        has_select_priv ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "Read::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "read-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) ~> $append(
+        !(has_super_priv or has_create_user_priv or has_grant_priv or has_create_priv or has_insert_priv or has_update_priv or has_delete_priv or has_drop_priv or has_select_priv) ? [{
+          "Project": "${jobConfig.name}",
+          "Entity Name": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": username,
+          "Entity Email": username,
+          "Entity - Has Access To Name": "No Access::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "no-access-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": "inactive",
+          "Entity First Name": $substringBefore(username, "."),
+          "Entity Last Name": $substringAfter(username, "."),
+          "Entity LastLoginTime": last_login_time,
+          "Entity LastPasswordChangedTime": last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []
+      ) : [])`;
+
     let transform: string;
     if (databases.length > 1) {
-      // Multi-database transform using array format with conditional checks
-      const transformParts = databases.map(
-        (db) =>
-          `    (${db.name}.users ? ${db.name}.users.{
-      "Project": "${jobConfig.name}",
-      "Entity Name": username & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region,
-      "Entity Type": "identity",
-      "Entity Source Type": "user",
-      "Entity Source ID": username & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region,
-      "Entity Username": username,
-      "Entity Email": username,
-      "Entity - Has Access To Name": $append(
-        has_super_priv ? [{"Entity - Has Access To Name": "Super" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "super-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_user_priv ? [{"Entity - Has Access To Name": "Create User" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-user-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_priv ? [{"Entity - Has Access To Name": "Create" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_insert_priv ? [{"Entity - Has Access To Name": "Insert" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "insert-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_update_priv ? [{"Entity - Has Access To Name": "Update" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "update-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_delete_priv ? [{"Entity - Has Access To Name": "Delete" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "delete-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_select_priv ? [{"Entity - Has Access To Name": "Select" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "select-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_drop_priv ? [{"Entity - Has Access To Name": "Drop" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "drop-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_grant_priv ? [{"Entity - Has Access To Name": "Grant" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "grant-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_drop_priv and !has_grant_priv and has_select_priv) ? [{"Entity - Has Access To Name": "Read Only" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "read-only-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_select_priv and !has_drop_priv and !has_grant_priv) ? [{"Entity - Has Access To Name": "No Access" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "no-access-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : []
-      )[0]."Entity - Has Access To Name",
-      "Entity - Has Access To Source ID": $append(
-        has_super_priv ? [{"Entity - Has Access To Name": "Super" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "super-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_user_priv ? [{"Entity - Has Access To Name": "Create User" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-user-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_priv ? [{"Entity - Has Access To Name": "Create" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_insert_priv ? [{"Entity - Has Access To Name": "Insert" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "insert-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_update_priv ? [{"Entity - Has Access To Name": "Update" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "update-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_delete_priv ? [{"Entity - Has Access To Name": "Delete" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "delete-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_select_priv ? [{"Entity - Has Access To Name": "Select" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "select-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_drop_priv ? [{"Entity - Has Access To Name": "Drop" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "drop-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_grant_priv ? [{"Entity - Has Access To Name": "Grant" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "grant-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_drop_priv and !has_grant_priv and has_select_priv) ? [{"Entity - Has Access To Name": "Read Only" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "read-only-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_select_priv and !has_drop_priv and !has_grant_priv) ? [{"Entity - Has Access To Name": "No Access" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "no-access-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : []
-      )[0]."Entity - Has Access To Source ID",
-      "Entity - Has Access To Entity Type": "connection",
-      "Entity - Has Access To Source Type": "role",
-      "Entity - Has Access To Permission Name": "access",
-      "Entity - Has Access To Permission Value": "true",
-      "Entity Status": can_login ? "active" : "inactive",
-      "Entity First Name": $substringBefore(username, "."),
-      "Entity Last Name": $substringAfter(username, "."),
-      "Entity LastLoginTime": last_login_time,
-      "Entity LastPasswordChangedTime": last_password_changed_time,
-      "Entity MfaEnabled": "false"
-    } : [])`
-      );
-
+      const transformParts = databases.map((db) => `    ${generateTransformForDb(db.name)}`);
       transform = `[\n${transformParts.join(',\n')}\n  ]`;
     } else {
-      // Single database transform using array format with conditional check
-      const db = databases[0];
-      transform = `[\n    (${db.name}.users ? ${db.name}.users.{
-      "Project": "${jobConfig.name}",
-      "Entity Name": username & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region,
-      "Entity Type": "identity",
-      "Entity Source Type": "user",
-      "Entity Source ID": username & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region,
-      "Entity Username": username,
-      "Entity Email": username,
-      "Entity - Has Access To Name": $append(
-        has_super_priv ? [{"Entity - Has Access To Name": "Super" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "super-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_user_priv ? [{"Entity - Has Access To Name": "Create User" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-user-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_priv ? [{"Entity - Has Access To Name": "Create" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_insert_priv ? [{"Entity - Has Access To Name": "Insert" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "insert-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_update_priv ? [{"Entity - Has Access To Name": "Update" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "update-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_delete_priv ? [{"Entity - Has Access To Name": "Delete" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "delete-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_select_priv ? [{"Entity - Has Access To Name": "Select" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "select-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_drop_priv ? [{"Entity - Has Access To Name": "Drop" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "drop-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_grant_priv ? [{"Entity - Has Access To Name": "Grant" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "grant-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_drop_priv and !has_grant_priv and has_select_priv) ? [{"Entity - Has Access To Name": "Read Only" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "read-only-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_select_priv and !has_drop_priv and !has_grant_priv) ? [{"Entity - Has Access To Name": "No Access" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "no-access-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : []
-      )[0]."Entity - Has Access To Name",
-      "Entity - Has Access To Source ID": $append(
-        has_super_priv ? [{"Entity - Has Access To Name": "Super" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "super-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_user_priv ? [{"Entity - Has Access To Name": "Create User" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-user-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_create_priv ? [{"Entity - Has Access To Name": "Create" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "create-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_insert_priv ? [{"Entity - Has Access To Name": "Insert" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "insert-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_update_priv ? [{"Entity - Has Access To Name": "Update" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "update-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_delete_priv ? [{"Entity - Has Access To Name": "Delete" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "delete-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_select_priv ? [{"Entity - Has Access To Name": "Select" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "select-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_drop_priv ? [{"Entity - Has Access To Name": "Drop" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "drop-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        has_grant_priv ? [{"Entity - Has Access To Name": "Grant" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "grant-priv-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_drop_priv and !has_grant_priv and has_select_priv) ? [{"Entity - Has Access To Name": "Read Only" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "read-only-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : [],
-        (!has_super_priv and !has_create_user_priv and !has_create_priv and !has_insert_priv and !has_update_priv and !has_delete_priv and !has_select_priv and !has_drop_priv and !has_grant_priv) ? [{"Entity - Has Access To Name": "No Access" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Source ID": "no-access-001" & "::" & $$.${db.name}.connection_info.db_name & "::" & $$.${db.name}.connection_info.region, "Entity - Has Access To Entity Type": "connection", "Entity - Has Access To Source Type": "role", "Entity - Has Access To Permission Name": "access"}] : []
-      )[0]."Entity - Has Access To Source ID",
-      "Entity - Has Access To Entity Type": "connection",
-      "Entity - Has Access To Source Type": "role",
-      "Entity - Has Access To Permission Name": "access",
-      "Entity - Has Access To Permission Value": "true",
-      "Entity Status": can_login ? "active" : "inactive",
-      "Entity First Name": $substringBefore(username, "."),
-      "Entity Last Name": $substringAfter(username, "."),
-      "Entity LastLoginTime": last_login_time,
-      "Entity LastPasswordChangedTime": last_password_changed_time,
-      "Entity MfaEnabled": "false"
-    } : [])
-  ]`;
+      transform = `[\n    ${generateTransformForDb(databases[0].name)}\n  ]`;
     }
 
     // Build the complete configuration

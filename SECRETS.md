@@ -1,32 +1,95 @@
 # QueryBird Secrets Management
 
-This document explains how to manage secrets in QueryBird, including templates, examples, and commands for updating secrets.
+This guide covers secrets management in QueryBird, including templates, commands, and best practices for production use.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Templates](#templates)
-- [Examples](#examples)
+- [Secrets Templates](#secrets-templates)
 - [Management Commands](#management-commands)
 - [External Secrets Import](#external-secrets-import)
 - [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-QueryBird uses encrypted secrets to store sensitive information like database credentials, API keys, and webhook URLs. The secrets are managed through command-line tools and can be imported from external files.
+QueryBird uses encrypted secrets to store sensitive information like database credentials, API keys, and webhook URLs. Secrets are managed through command-line tools and can be imported from external files.
 
-## External Secrets File Templates
+### Secrets File Location
+- **Production**: `./querybird-data/secrets/secrets.json`
+- **Development**: `./test-data/secrets/secrets.json`
 
-These are the files you create to import database configurations into QueryBird.
+## Secrets Templates
 
 ### PostgreSQL Template
-
 ```json
 {
   "your-job-id": {
     "database": {
-      "production": {
-        "host": "prod.example.com",
+      "primary": {
+        "host": "your-db-host.com",
+        "port": 5432,
+        "database": "your_database",
+        "user": "your_username",
+        "password": "your_password",
+        "region": "us-east-1",
+        "ssl": true,
+        "timeout": 30000
+      },
+      "staging": {
+        "host": "staging-db-host.com",
+        "port": 5432,
+        "database": "staging_database",
+        "user": "staging_username",
+        "password": "staging_password",
+        "region": "us-west-1",
+        "ssl": true,
+        "timeout": 30000
+      }
+    },
+    "webhooks": {
+      "webhook_url": "https://your-webhook-endpoint.com"
+    },
+    "api_keys": {
+      "balkan_integration_id": "your_integration_id"
+    }
+  }
+}
+```
+
+### MySQL Template
+```json
+{
+  "mysql-job-id": {
+    "database": {
+      "primary": {
+        "host": "mysql-host.com",
+        "port": 3306,
+        "database": "your_database",
+        "user": "your_username",
+        "password": "your_password",
+        "region": "us-east-1",
+        "ssl": true,
+        "timeout": 30000
+      }
+    },
+    "webhooks": {
+      "webhook_url": "https://your-webhook-endpoint.com"
+    },
+    "api_keys": {
+      "balkan_integration_id": "your_integration_id"
+    }
+  }
+}
+```
+
+### Multi-Environment Template
+```json
+{
+  "production-job": {
+    "database": {
+      "primary": {
+        "host": "prod-db.company.com",
         "port": 5432,
         "database": "prod_app",
         "user": "prod_user",
@@ -34,9 +97,16 @@ These are the files you create to import database configurations into QueryBird.
         "region": "us-east-1",
         "ssl": true,
         "timeout": 30000
-      },
-      "staging": {
-        "host": "staging.example.com",
+      }
+    },
+    "webhooks": {
+      "webhook_url": "https://api.company.com/webhook/prod"
+    }
+  },
+  "staging-job": {
+    "database": {
+      "primary": {
+        "host": "staging-db.company.com",
         "port": 5432,
         "database": "staging_app",
         "user": "staging_user",
@@ -46,55 +116,24 @@ These are the files you create to import database configurations into QueryBird.
         "timeout": 30000
       }
     },
-    "api_keys": {
-      "balkan_integration_id": "your_integration_id"
+    "webhooks": {
+      "webhook_url": "https://api.company.com/webhook/staging"
     }
   }
 }
 ```
-
-**Note**: The `api_keys` section is optional. If you don't include it, the command will prompt you for the integration ID.
-
-### MySQL Template
-
-For MySQL databases:
-
-```json
-{
-  "mysql-job": {
-    "database": {
-      "mysql-primary": {
-        "host": "mysql.example.com",
-        "port": 3306,
-        "database": "mysql_database",
-        "user": "mysql_user",
-        "password": "mysql_password",
-        "region": "us-east-1",
-        "ssl": true,
-        "timeout": 30000
-      }
-    },
-    "api_keys": {
-      "balkan_integration_id": "your_integration_id"
-    }
-  }
-}
-```
-
-**Note**: The `api_keys` section is optional. If you don't include it, the command will prompt you for the integration ID.
 
 ## Management Commands
 
-### Interactive Secrets Setup
-
+### Interactive Setup
 ```bash
 # Full interactive wizard
-querybird secrets wizard
+docker-compose run --rm querybird-cli secrets wizard
 
 # Setup specific secret types
-querybird secrets database
-querybird secrets api-keys
-querybird secrets webhooks
+docker-compose run --rm querybird-cli secrets database
+docker-compose run --rm querybird-cli secrets api-keys
+docker-compose run --rm querybird-cli secrets webhooks
 ```
 
 ### Manual Secrets Management
@@ -102,119 +141,119 @@ querybird secrets webhooks
 #### Setting Secrets
 ```bash
 # Set database host
-querybird secrets set --path "daily-sync.database.primary.host" --value "new-db-host.com"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.database.primary.host" \
+  --value "new-db-host.com"
 
 # Set database password
-querybird secrets set --path "daily-sync.database.primary.password" --value "new_secure_password"
-
-# Set Balkan integration ID
-querybird secrets set --path "daily-sync.api_keys.balkan_integration_id" --value "new_integration_123"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.database.primary.password" \
+  --value "new_secure_password"
 
 # Set webhook URL
-querybird secrets set --path "daily-sync.webhooks.webhook_url" --value "https://new-webhook.com/endpoint"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.webhooks.webhook_url" \
+  --value "https://new-webhook.com/endpoint"
 
-# Set global Balkan API key
-querybird secrets set --path "balkan.balkan_key_id" --value "bk_live_new_key_123"
-querybird secrets set --path "balkan.balkan_key_secret" --value "bks_live_new_secret_456"
+# Set API key
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.api_keys.balkan_integration_id" \
+  --value "new_integration_123"
 ```
 
 #### Getting Secrets
 ```bash
 # Get database host
-querybird secrets get --path "daily-sync.database.primary.host"
+docker-compose run --rm querybird-cli secrets get \
+  --path "job.database.primary.host"
 
-# Get all database configurations for a job
-querybird secrets get --path "daily-sync.database"
+# Get all database configurations
+docker-compose run --rm querybird-cli secrets get \
+  --path "job.database"
 
-# Get integration ID
-querybird secrets get --path "daily-sync.api_keys.balkan_integration_id"
+# Get webhook URL
+docker-compose run --rm querybird-cli secrets get \
+  --path "job.webhooks.webhook_url"
 ```
 
 #### Listing Secrets
 ```bash
 # List all secret paths
-querybird secrets list
+docker-compose run --rm querybird-cli secrets list
 
 # List paths for specific job
-querybird secrets list | grep "daily-sync"
+docker-compose run --rm querybird-cli secrets list | grep "job-name"
 ```
 
 ### Updating Existing Secrets
 
-#### Update Database Credentials
+#### Database Credentials
 ```bash
 # Update database password after rotation
-querybird secrets set --path "user-export.database.production.password" --value "rotated_password_789"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.database.primary.password" \
+  --value "rotated_password_789"
 
 # Update database host after migration
-querybird secrets set --path "user-export.database.production.host" --value "new-primary.example.com"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.database.primary.host" \
+  --value "new-primary.example.com"
 
 # Update connection timeout
-querybird secrets set --path "user-export.database.production.timeout" --value "45000"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.database.primary.timeout" \
+  --value "45000"
 ```
 
-#### Update API Keys
-```bash
-# Update integration ID for specific job
-querybird secrets set --path "audit-job.api_keys.balkan_integration_id" --value "updated_integration_456"
-
-# Update global Balkan credentials
-querybird secrets set --path "balkan.balkan_key_id" --value "bk_live_updated_key"
-querybird secrets set --path "balkan.balkan_key_secret" --value "bks_live_updated_secret"
-```
-
-#### Update Webhook URLs
+#### API Keys and Webhooks
 ```bash
 # Update webhook endpoint
-querybird secrets set --path "notification-job.webhooks.webhook_url" --value "https://api.company.com/v2/webhooks"
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.webhooks.webhook_url" \
+  --value "https://api.company.com/v2/webhooks"
 
-# Add new webhook for existing job
-querybird secrets set --path "data-sync.webhooks.backup_webhook" --value "https://backup.company.com/webhook"
+# Update integration ID
+docker-compose run --rm querybird-cli secrets set \
+  --path "job.api_keys.balkan_integration_id" \
+  --value "updated_integration_456"
 ```
 
 ### Batch Secret Updates
-
-For multiple updates, you can use shell scripts:
-
 ```bash
 #!/bin/bash
 # Update all production database passwords
 
-querybird secrets set --path "job1.database.primary.password" --value "$NEW_PASSWORD"
-querybird secrets set --path "job2.database.primary.password" --value "$NEW_PASSWORD"
-querybird secrets set --path "job3.database.primary.password" --value "$NEW_PASSWORD"
+NEW_PASSWORD="new_secure_password_123"
+
+docker-compose run --rm querybird-cli secrets set \
+  --path "job1.database.primary.password" \
+  --value "$NEW_PASSWORD"
+
+docker-compose run --rm querybird-cli secrets set \
+  --path "job2.database.primary.password" \
+  --value "$NEW_PASSWORD"
+
+docker-compose run --rm querybird-cli secrets set \
+  --path "job3.database.primary.password" \
+  --value "$NEW_PASSWORD"
 
 echo "✅ Updated passwords for all production databases"
 ```
 
-### Generate Config from Secrets
+## External Secrets Import
 
-```bash
-# Generate PostgreSQL config from existing secrets
-querybird config-postgres --job-id your-job-id
+### Step 1: Create External Secrets File
+Create a JSON file with your database configurations using the templates above.
 
-# Generate from external secrets file
-querybird config-postgres --job-id external-job --secrets-file /path/to/external-secrets.json
-
-# Generate MySQL config
-querybird config-mysql --job-id mysql-job
-```
-
-## Using External Secrets Files
-
-### Step 1: Create Your Secrets File
-
-Create a JSON file with your database configurations (use templates above).
-
-Example `client-database.json`:
+**Example `production-secrets.json`:**
 ```json
 {
-  "client-export": {
+  "production-users": {
     "database": {
-      "client-prod": {
-        "host": "client-db.example.com",
+      "primary": {
+        "host": "prod-db.company.com",
         "port": 5432,
-        "database": "client_app",
+        "database": "users_db",
         "user": "readonly_user",
         "password": "secure_password_123",
         "region": "us-east-1",
@@ -222,96 +261,164 @@ Example `client-database.json`:
         "timeout": 30000
       }
     },
-    "api_keys": {
-      "balkan_integration_id": "client_integration_789"
+    "webhooks": {
+      "webhook_url": "https://api.company.com/webhook/users"
     }
   }
 }
 ```
 
 ### Step 2: Import and Generate Config
-
 ```bash
 # For PostgreSQL
-querybird config-postgres --job-id client-export --secrets-file client-database.json
+docker-compose run --rm querybird-cli config-postgres \
+  --job-id production-users \
+  --secrets-file /workspace/production-secrets.json
 
-# For MySQL  
-querybird config-mysql --job-id mysql-job --secrets-file mysql-secrets.json
+# For MySQL
+docker-compose run --rm querybird-cli config-mysql \
+  --job-id mysql-job \
+  --secrets-file /workspace/mysql-secrets.json
 ```
 
 ### Step 3: Complete the Setup
-
 The command will:
 1. ✅ Import your database configurations
-2. ✅ Import your integration ID (if included in external file)
+2. ✅ Import your webhook URLs and API keys
 3. ❓ Ask for job name, description, and schedule
-4. ❓ Ask for integration ID (if not included in external file)
-5. ✅ Generate the complete job configuration
-6. ✅ Save everything to QueryBird
+4. ✅ Generate the complete job configuration
+5. ✅ Save everything to QueryBird
 
 ### Important Notes
-
-- **Global Balkan API keys** are never imported from external files (they stay in QueryBird's main secrets)
-- **Only job-specific data** is imported (databases and integration IDs)  
 - **External files are not modified** - data is copied to QueryBird
+- **Only job-specific data** is imported (databases, webhooks, API keys)
+- **Global settings** remain in QueryBird's main secrets file
 
+## Best Practices
 
-### Database Connection Settings
+### Security
+1. **Use strong passwords** for database connections
+2. **Enable SSL** for database connections when possible
+3. **Rotate credentials** regularly
+4. **Use environment-specific secrets** files
+5. **Restrict file permissions** on secrets files
 
-#### PostgreSQL Recommended Settings
-```json
+### Organization
+1. **Use descriptive job IDs** that indicate purpose and environment
+2. **Group related secrets** under the same job ID
+3. **Use consistent naming** for database connections
+4. **Document secret purposes** in comments or documentation
+
+### File Management
+1. **Keep secrets files separate** from application code
+2. **Use version control** for secrets templates (without actual credentials)
+3. **Backup secrets files** regularly
+4. **Use different files** for different environments
+
+### Example Production Setup
+```bash
+# Create environment-specific secrets directories
+mkdir -p /opt/querybird-secrets/{production,staging,development}
+
+# Set proper permissions
+chmod 700 /opt/querybird-secrets
+chmod 600 /opt/querybird-secrets/*/*.json
+
+# Create production secrets
+cat > /opt/querybird-secrets/production/database.json << 'EOF'
 {
-  "host": "postgres.example.com",
-  "port": 5432,
-  "database": "your_database",
-  "user": "querybird_reader",
-  "password": "secure_password",
-  "region": "us-east-1",
-  "ssl": true,
-  "timeout": 30000
+  "prod-users": {
+    "database": {
+      "primary": {
+        "host": "prod-db.company.com",
+        "port": 5432,
+        "database": "users",
+        "user": "querybird_reader",
+        "password": "secure_prod_password",
+        "region": "us-east-1",
+        "ssl": true,
+        "timeout": 30000
+      }
+    },
+    "webhooks": {
+      "webhook_url": "https://api.company.com/webhook/users"
+    }
+  }
 }
+EOF
+
+# Update docker-compose.yml to mount secrets directory
+# volumes:
+#   - /opt/querybird-secrets:/external-secrets
 ```
 
-#### MySQL Recommended Settings
-```json
-{
-  "host": "mysql.example.com",
-  "port": 3306,
-  "database": "your_database",
-  "user": "querybird_reader",
-  "password": "secure_password",
-  "region": "us-east-1",
-  "ssl": true,
-  "timeout": 30000
-}
-```
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"No secrets found for job ID"**
-   - Ensure the job ID exists in secrets.json
-   - Check that the secrets file is in the correct location
-   - Verify the QB_CONFIG_DIR environment variable
+#### 1. "No secrets found for job ID"
+```bash
+# Check if job ID exists
+docker-compose run --rm querybird-cli secrets list | grep "job-id"
 
-2. **"Database connection failed"**
-   - Verify host, port, and credentials
-   - Check SSL requirements
-   - Ensure network connectivity
-   - Verify timeout settings
+# Verify secrets file location
+ls -la ./querybird-data/secrets/secrets.json
 
-3. **"Balkan integration ID missing"**
-   - Add the integration ID to `api_keys.balkan_integration_id`
-   - Ensure global Balkan keys are set in the `balkan` section
+# Check file permissions
+ls -la ./querybird-data/secrets/
+```
 
-4. **Secrets not reloading**
-   - Check if `--watch-secrets` is enabled (default: enabled)
-   - Verify the secrets file permissions
-   - Check QueryBird logs for file watching errors
+#### 2. "Database connection failed"
+```bash
+# Verify database credentials
+docker-compose run --rm querybird-cli secrets get --path "job.database.primary.host"
+docker-compose run --rm querybird-cli secrets get --path "job.database.primary.password"
+
+# Test database connectivity
+docker-compose run --rm querybird-cli health
+
+# Check network connectivity
+docker-compose run --rm querybird-cli ping your-db-host.com
+```
+
+#### 3. "Secrets not reloading"
+```bash
+# Check if hot reloading is enabled
+docker-compose logs querybird | grep "watch-secrets"
+
+# Verify secrets file permissions
+ls -la ./querybird-data/secrets/secrets.json
+
+# Check QueryBird logs for file watching errors
+docker-compose logs querybird | grep "secrets"
+```
+
+#### 4. "External secrets file not found"
+```bash
+# Verify file exists and is accessible
+ls -la /workspace/your-secrets.json
+
+# Check volume mount in docker-compose.yml
+docker-compose config | grep -A 10 "volumes:"
+
+# Test file access from container
+docker-compose run --rm querybird-cli ls -la /workspace/
+```
+
+### Debug Commands
+```bash
+# Check secrets file content
+docker-compose run --rm querybird-cli cat /app/.querybird/secrets/secrets.json
+
+# Verify job configuration
+docker-compose run --rm querybird-cli cat /app/.querybird/configs/job-name.yml
+
+# Test database connection
+docker-compose run --rm querybird-cli run-once --job-id job-name --log-level debug
+```
 
 ### Getting Help
-
-- Check the main [README.md](README.md) for general information
+- Check the main [README.md](README.md) for quick start guide
 - Review [DOCUMENTATION.md](DOCUMENTATION.md) for complete feature documentation
-- Use `querybird --help` for command-line help
-- Use `querybird secrets --help` for secrets-specific help
+- Use `docker-compose run --rm querybird-cli --help` for command-line help
+- Use `docker-compose run --rm querybird-cli secrets --help` for secrets-specific help

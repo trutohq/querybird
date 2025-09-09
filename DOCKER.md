@@ -1,87 +1,197 @@
-# QueryBird Docker Setup
+# QueryBird Docker Deployment
 
-QueryBird now supports containerized deployment with Docker, eliminating the complexity of systemd services and providing a consistent cross-platform experience.
+This guide covers Docker deployment options for QueryBird, including production setup, development environment, and advanced configurations.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Production Deployment](#production-deployment)
+- [Development Environment](#development-environment)
+- [External Secrets Configuration](#external-secrets-configuration)
+- [Docker Images](#docker-images)
+- [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
-### 1. Build and Run
+### Production Setup
 ```bash
-# Build the image
-docker build -t querybird:latest .
+# 1. Download production configuration
+curl -fsSL https://raw.githubusercontent.com/trutohq/querybird/main/docker-compose.production.yml > docker-compose.yml
 
-# Run with Docker Compose (recommended)
+# 2. Start QueryBird
 docker-compose up -d
 
-# Or run directly
-docker run -d --name querybird \
-  -v ~/.querybird:/app/.querybird \
-  --network host \
-  querybird:latest
+# 3. Verify it's running
+docker-compose ps
 ```
 
-### 2. CLI Commands via Docker
+### Development Setup
 ```bash
-# Use the wrapper script (copy to your PATH)
-cp docker/querybird-wrapper.sh /usr/local/bin/querybird
-chmod +x /usr/local/bin/querybird
+# 1. Clone repository
+git clone https://github.com/trutohq/querybird.git
+cd querybird
 
-# Now use exactly like before
-querybird init-postgres
-querybird run-once --job-id my-job
-querybird start
+# 2. Start development environment
+docker-compose -f docker-compose.test.yml up -d
+
+# 3. View logs
+docker-compose logs -f querybird
 ```
 
-### 3. Docker Compose CLI
+## Production Deployment
+
+### Using Pre-built Images
 ```bash
-# Run CLI commands
-docker-compose run --rm querybird-cli init-postgres
-docker-compose run --rm querybird-cli secrets:wizard
+# Download production docker-compose
+curl -fsSL https://raw.githubusercontent.com/trutohq/querybird/main/docker-compose.production.yml > docker-compose.yml
+
+# Start QueryBird
+docker-compose up -d
+
+# Verify deployment
+docker-compose ps
+```
+
+### Custom Configuration
+```yaml
+# docker-compose.yml
+services:
+  querybird:
+    image: ghcr.io/trutohq/querybird:latest
+    container_name: querybird
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      - ./querybird-data/configs:/app/.querybird/configs
+      - ./querybird-data/secrets:/app/.querybird/secrets
+      - ./querybird-data/watermarks:/app/.querybird/watermarks
+      - ./querybird-data/outputs:/app/.querybird/outputs
+      - ./querybird-data/logs:/app/.querybird/logs
+    networks:
+      - querybird-network
+    healthcheck:
+      test: ['CMD', 'bun', 'run', 'dist/main-runner.js', 'health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  querybird-cli:
+    image: ghcr.io/trutohq/querybird:latest
+    profiles: ['cli']
+    environment:
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      - ./querybird-data/configs:/app/.querybird/configs
+      - ./querybird-data/secrets:/app/.querybird/secrets
+      - ./querybird-data/watermarks:/app/.querybird/watermarks
+      - ./querybird-data/outputs:/app/.querybird/outputs
+      - ./querybird-data/logs:/app/.querybird/logs
+      - ./:/workspace
+    networks:
+      - querybird-network
+    working_dir: /workspace
+    entrypoint: ['bun', 'run', 'dist/main-runner.js']
+
+networks:
+  querybird-network:
+    driver: bridge
+```
+
+### CLI Commands
+```bash
+# Run job once
 docker-compose run --rm querybird-cli run-once --job-id my-job
 
+# Generate PostgreSQL config
+docker-compose run --rm querybird-cli config-postgres \
+  --job-id my-job \
+  --secrets-file /workspace/secrets.json
+
+# Interactive setup
+docker-compose run --rm querybird-cli init-postgres
+
+# Health check
+docker-compose run --rm querybird-cli health
+```
+
+## Development Environment
+
+### Test Environment
+The development environment includes test databases and management tools:
+
+```bash
+# Start development environment
+docker-compose -f docker-compose.test.yml up -d
+
+# Available services:
+# - QueryBird: Main application
+# - PostgreSQL Primary: Test database (port 5432)
+# - PostgreSQL Staging: Test database (port 5433)
+# - MySQL: Test database (port 3306)
+# - pgAdmin: Database management (port 8080)
+# - phpMyAdmin: MySQL management (port 8081)
+```
+
+### Development Commands
+```bash
 # View logs
 docker-compose logs -f querybird
+
+# Run tests
+docker-compose run --rm querybird-cli test
+
+# Access databases
+# PostgreSQL Primary: localhost:5432
+# PostgreSQL Staging: localhost:5433
+# MySQL: localhost:3306
+# pgAdmin: http://localhost:8080
+# phpMyAdmin: http://localhost:8081
+```
+
+### Available Scripts
+```bash
+# Development
+npm run dev:docker          # Start development environment
+npm run dev:docker:logs     # View development logs
+
+# Docker Management
+npm run docker:build        # Build production image
+npm run docker:start        # Start services
+npm run docker:stop         # Stop services
+npm run docker:logs         # View service logs
+npm run docker:cli          # Run CLI commands
+npm run clean:docker        # Clean up volumes and containers
 ```
 
 ## External Secrets Configuration
 
-QueryBird supports using external secrets files that are stored outside the container. This is useful for:
-- Sharing secrets across multiple environments
-- Keeping secrets separate from application code
-- Version controlling secrets independently
-
 ### Setup External Secrets Volume
-
-**1. Edit your `docker-compose.yml` file:**
-
 ```yaml
+# docker-compose.yml
 services:
   querybird-cli:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    profiles: ["cli"]
-    environment:
-      - QB_CONFIG_DIR=/app/.querybird
+    # ... existing configuration
     volumes:
-      - querybird_configs:/app/.querybird/configs
-      - querybird_secrets:/app/.querybird/secrets
-      - querybird_logs:/app/.querybird/logs
+      - ./querybird-data/configs:/app/.querybird/configs
+      - ./querybird-data/secrets:/app/.querybird/secrets
+      - ./querybird-data/watermarks:/app/.querybird/watermarks
+      - ./querybird-data/outputs:/app/.querybird/outputs
+      - ./querybird-data/logs:/app/.querybird/logs
       - ./:/workspace
-      # Add your external secrets directory
+      # Add external secrets directory
       - /path/to/your/secrets/directory:/external-secrets
-    networks:
-      - querybird-network
-    working_dir: /workspace
-    entrypoint: ["bun", "run", "dist/main-runner.js"]
 ```
 
-**2. Create your external secrets directory:**
-
+### Using External Secrets
 ```bash
-# Create a directory for your external secrets
+# Create external secrets directory
 mkdir -p /opt/querybird-secrets
 
-# Create environment-specific secrets
+# Create production secrets
 cat > /opt/querybird-secrets/production.json << 'EOF'
 {
   "prod-users": {
@@ -90,7 +200,7 @@ cat > /opt/querybird-secrets/production.json << 'EOF'
         "host": "prod-db.company.com",
         "port": 5432,
         "database": "users",
-        "username": "readonly",
+        "user": "readonly",
         "password": "secure-password"
       }
     },
@@ -101,215 +211,161 @@ cat > /opt/querybird-secrets/production.json << 'EOF'
 }
 EOF
 
-cat > /opt/querybird-secrets/staging.json << 'EOF'
-{
-  "staging-users": {
-    "database": {
-      "primary": {
-        "host": "staging-db.company.com",
-        "port": 5432,
-        "database": "users",
-        "username": "readonly",
-        "password": "staging-password"
-      }
-    }
-  }
-}
-EOF
-```
+# Update docker-compose.yml
+# volumes:
+#   - /opt/querybird-secrets:/external-secrets
 
-**3. Update your docker-compose.yml with the actual path:**
-
-```yaml
-volumes:
-  - /opt/querybird-secrets:/external-secrets
-```
-
-### Using External Secrets
-
-Once configured, you can use external secrets files with the config commands:
-
-```bash
-# Generate config for production
+# Use external secrets
 docker-compose run --rm querybird-cli config-postgres \
   --job-id prod-users \
   --secrets-file /external-secrets/production.json
-
-# Generate config for staging
-docker-compose run --rm querybird-cli config-postgres \
-  --job-id staging-users \
-  --secrets-file /external-secrets/staging.json
 ```
 
 ### Benefits
-
 - ✅ **One-time setup** - Configure volume mount once, use everywhere
 - ✅ **Environment separation** - Keep prod/staging/dev secrets separate
 - ✅ **Version control** - Track secrets changes independently
 - ✅ **Security** - External secrets can have different permissions
 - ✅ **Backup & restore** - Easier to backup secret files separately
 
-## Development
+## Docker Images
 
-### Hot Reload Development
+### Available Images
+QueryBird publishes multi-architecture images to GitHub Container Registry:
+
 ```bash
-# Start development environment with hot reload
-npm run dev:docker
+# Latest version
+docker pull ghcr.io/trutohq/querybird:latest
 
-# View logs
-npm run dev:docker:logs
+# Specific version
+docker pull ghcr.io/trutohq/querybird:v1.0.0
 
-# Access databases
-# PostgreSQL Primary: localhost:5432
-# PostgreSQL Staging: localhost:5433  
-# MySQL: localhost:3306
-# pgAdmin: http://localhost:8081
+# Check available tags
+curl -s https://api.github.com/repos/trutohq/querybird/packages
 ```
 
-### Available Scripts
+### Image Tags
+- `latest` - Latest stable release (main branch)
+- `vX.Y.Z` - Specific version tags
+- `vX.Y` - Minor version tags
+- `vX` - Major version tags
+
+### Multi-Architecture Support
+Images are built for:
+- `linux/amd64` - Intel/AMD 64-bit
+- `linux/arm64` - ARM 64-bit (Apple Silicon, ARM servers)
+
+### Building from Source
 ```bash
-npm run docker:build      # Build production image
-npm run docker:start      # Start services
-npm run docker:stop       # Stop services
-npm run docker:logs       # View logs
-npm run docker:cli        # Run CLI commands
-npm run clean:docker      # Clean up volumes and containers
-```
+# Build production image
+docker build -t querybird:latest .
 
-## Configuration
+# Build with specific tag
+docker build -t querybird:v1.0.0 .
 
-### Volume Mounts
-- **Configs**: `~/.querybird/configs` → `/app/.querybird/configs`
-- **Secrets**: `~/.querybird/secrets` → `/app/.querybird/secrets`
-- **Logs**: `~/.querybird/logs` → `/app/.querybird/logs`
-
-### Environment Variables
-- `QB_CONFIG_DIR`: Configuration base directory (default: `/app/.querybird`)
-- `LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`)
-- `NODE_ENV`: Environment (`development`, `production`)
-
-## Deployment Options
-
-### 1. Docker Compose (Recommended)
-```bash
-# Production deployment
-docker-compose up -d
-
-# With custom configuration
-QB_CONFIG_DIR=/custom/path docker-compose up -d
-```
-
-### 2. Docker Run
-```bash
-# Basic deployment
-docker run -d \
-  --name querybird \
-  --restart unless-stopped \
-  -v ~/.querybird:/app/.querybird \
-  --network host \
-  querybird:latest
-
-# With environment overrides
-docker run -d \
-  --name querybird \
-  --restart unless-stopped \
-  -v ~/.querybird:/app/.querybird \
-  -e LOG_LEVEL=debug \
-  -e NODE_ENV=production \
-  --network host \
-  querybird:latest
-```
-
-### 3. Docker Swarm / Kubernetes
-The Docker images are ready for orchestration platforms. See the included `docker-compose.yml` as a starting point.
-
-## Networking
-
-### Host Network Mode (Default)
-Uses `--network host` for direct database access on `localhost:5432`, `localhost:5433`, etc.
-
-### Bridge Network
-For isolated networking:
-```yaml
-services:
-  querybird:
-    networks:
-      - querybird-network
-    # Connect to databases via service names
-    
-networks:
-  querybird-network:
-    driver: bridge
-```
-
-## Health Checks
-
-QueryBird includes built-in health checks:
-```bash
-# Manual health check
-docker exec querybird bun run dist/main-runner.js health
-
-# Docker health status
-docker ps  # Shows health status
-```
-
-## Migration from SystemD
-
-### Before (SystemD)
-```bash
-# Complex installation
-curl -fsSL install.sh | bash
-sudo systemctl enable querybird
-sudo systemctl start querybird
-
-# Updates require reinstallation
-```
-
-### After (Docker)
-```bash
-# Simple deployment
-docker-compose up -d
-
-# Updates are just image pulls
-docker-compose pull && docker-compose up -d
+# Build for specific architecture
+docker buildx build --platform linux/amd64 -t querybird:latest .
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**1. Permission Issues**
+#### 1. Container Won't Start
 ```bash
-# Fix volume permissions
-sudo chown -R $(id -u):$(id -g) ~/.querybird
-```
-
-**2. Port Conflicts**
-```bash
-# Check what's using ports
-ss -tlnp | grep :5432
-```
-
-**3. Database Connection Issues**
-```bash
-# Test database connectivity
-docker-compose run --rm querybird-cli \
-  bun run dist/main-runner.js health
-```
-
-### Logs
-```bash
-# Container logs
+# Check container logs
 docker-compose logs querybird
 
-# Application logs
-docker-compose exec querybird tail -f .querybird/logs/querybird.log
+# Check container status
+docker-compose ps
+
+# Check if ports are available
+netstat -tlnp | grep :8080
+```
+
+#### 2. Permission Issues
+```bash
+# Fix volume permissions
+sudo chown -R $(id -u):$(id -g) ./querybird-data/
+
+# Fix specific file permissions
+chmod 644 ./querybird-data/secrets/secrets.json
+chmod 644 ./querybird-data/configs/*.yml
+```
+
+#### 3. Database Connection Issues
+```bash
+# Test database connectivity
+docker-compose run --rm querybird-cli health
+
+# Check database credentials
+docker-compose run --rm querybird-cli secrets get --path "job.database.host"
+
+# Test network connectivity
+docker-compose run --rm querybird-cli ping your-db-host.com
+```
+
+#### 4. Secrets Not Found
+```bash
+# Verify secrets file exists
+ls -la ./querybird-data/secrets/secrets.json
+
+# List available secrets
+docker-compose run --rm querybird-cli secrets list
+
+# Check file permissions
+ls -la ./querybird-data/secrets/
 ```
 
 ### Debug Mode
 ```bash
 # Run with debug logging
-LOG_LEVEL=debug docker-compose up
+docker-compose run --rm querybird-cli start --log-level debug
+
+# Run job with debug logging
+docker-compose run --rm querybird-cli run-once --job-id job-name --log-level debug
+```
+
+### Health Checks
+```bash
+# Check container health
+docker inspect querybird --format='{{.State.Health.Status}}'
+
+# Manual health check
+docker-compose run --rm querybird-cli health
+
+# Check database connections
+docker-compose run --rm querybird-cli secrets list
+```
+
+### Logs
+```bash
+# View all logs
+docker-compose logs querybird
+
+# Follow logs in real-time
+docker-compose logs -f querybird
+
+# View specific log level
+docker-compose logs querybird | grep "ERROR"
+
+# View job-specific logs
+docker-compose logs querybird | grep "job-name"
+```
+
+### Cleanup
+```bash
+# Stop and remove containers
+docker-compose down
+
+# Remove volumes (WARNING: This will delete all data)
+docker-compose down -v
+
+# Remove images
+docker rmi ghcr.io/trutohq/querybird:latest
+
+# Clean up everything
+docker system prune -a
 ```
 
 ## Benefits of Docker Approach
@@ -321,64 +377,10 @@ LOG_LEVEL=debug docker-compose up
 - ✅ **Simpler CI/CD** - Standard Docker build pipeline
 - ✅ **Cross-platform** - Runs on any Docker host
 - ✅ **Isolation** - No system pollution or conflicts
-
-## 🚀 Release Process (For Maintainers)
-
-QueryBird uses GitHub Container Registry for Docker image distribution.
-
-### Automated Releases
-
-The release process is fully automated:
-
-1. **Version bump** - Update `version` in `package.json`
-2. **Push to main** - Triggers GitHub Action workflow
-3. **Auto-release** - Builds and publishes Docker images to `ghcr.io/trutohq/querybird`
-
-### Release Workflow
-
-```yaml
-# Triggered by:
-- Push to main (with package.json version change)
-- Manual workflow dispatch
-- GitHub release events
-
-# Publishes:
-- ghcr.io/trutohq/querybird:latest
-- ghcr.io/trutohq/querybird:v1.0.0
-- Multi-architecture: linux/amd64, linux/arm64
-```
-
-### Manual Release
-
-```bash
-# Trigger manual release
-gh workflow run docker-release.yml --field version=1.0.0
-
-# Or via GitHub UI
-# Actions -> Docker Release -> Run workflow
-```
-
-### Image Tags
-
-- `latest` - Latest stable release (main branch)
-- `vX.Y.Z` - Specific version tags
-- `vX.Y` - Minor version tags  
-- `vX` - Major version tags
-
-### For Users
-
-Users get releases via:
-
-```bash
-# Download production docker-compose
-curl -fsSL https://raw.githubusercontent.com/trutohq/querybird/main/docker-compose.production.yml > docker-compose.yml
-
-# Start latest version
-docker-compose pull && docker-compose up -d
-```
+- ✅ **Scalability** - Easy to scale with orchestration platforms
 
 ## Need Help?
 
 - Check logs: `docker-compose logs querybird`
-- Health check: `docker exec querybird querybird health`
+- Health check: `docker-compose run --rm querybird-cli health`
 - GitHub Issues: https://github.com/trutohq/querybird/issues

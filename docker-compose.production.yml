@@ -17,12 +17,11 @@ services:
       - ./querybird-data/watermarks:/app/.querybird/watermarks
       - ./querybird-data/outputs:/app/.querybird/outputs
       - ./querybird-data/logs:/app/.querybird/logs
-      # Optional: External secrets directory
-      # - /opt/querybird-secrets:/external-secrets
+
     networks:
       - querybird-network
     healthcheck:
-      test: ["CMD", "bun", "run", "dist/main-runner.js", "health"]
+      test: ['CMD', 'bun', 'run', 'dist/main-runner.js', 'health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,7 +33,7 @@ services:
   # CLI service for running commands in production
   querybird-cli:
     image: ghcr.io/trutohq/querybird:latest
-    profiles: ["cli"]
+    profiles: ['cli']
     environment:
       - QB_CONFIG_DIR=/app/.querybird
     volumes:
@@ -51,16 +50,11 @@ services:
     networks:
       - querybird-network
     working_dir: /workspace
-    entrypoint: ["bun", "run", "dist/main-runner.js"]
-
-volumes:
-  postgres_data:
-    driver: local
+    entrypoint: ['bun', 'run', 'dist/main-runner.js']
 
 networks:
   querybird-network:
     driver: bridge
-
 # Production deployment notes:
 #
 # 1. SECURITY:

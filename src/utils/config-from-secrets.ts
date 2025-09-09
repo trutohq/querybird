@@ -272,7 +272,7 @@ export class ConfigFromSecrets {
       };
     }
 
-    const transform = this.generateTransform(databases, metadata.name);
+    const transform = this.generateTransform(databases, metadata.name, dbType);
 
     const config = {
       id: jobId,
@@ -322,133 +322,280 @@ export class ConfigFromSecrets {
     }
   }
 
-  private generateTransform(databases: Array<{ name: string; config: any }>, projectName: string): string {
-    const generateTransformForDb = (dbName: string) =>
-      `$map(${dbName}.users, function($user) {
-        $append([
-          {
+  private generateTransform(databases: Array<{ name: string; config: any }>, projectName: string, dbType: 'postgres' | 'mysql' = 'postgres'): string {
+    if (dbType === 'mysql') {
+      return `(
+  $root := $;
+  $keys($root).(
+    $env := $lookup($root, $);
+    ($env.users and $env.connection_info)
+    ?
+    $env.users.(
+      $uname := username;
+      $db := $env.connection_info.db_name;
+      $reg := $env.connection_info.region;
+      $full := $uname & "::" & $db & "::" & $reg;
+      $first := $contains($uname, ".") ? $substringBefore($uname, ".") : $uname;
+      $last := $contains($uname, ".") ? $substringAfter($uname, ".");
+
+      ([])
+        ~> $append(
+          has_super_priv ? [{
             "Project": "${projectName}",
-            "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+            "Entity Name": $full,
             "Entity Type": "identity",
             "Entity Source Type": "user",
-            "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-            "Entity Username": $user.username,
-            "Entity Email": $user.username,
-            "Entity Status": $user.can_login ? "active" : "inactive",
-            "Entity First Name": $substringBefore($user.username, "."),
-            "Entity Last Name": $substringAfter($user.username, "."),
-            "Entity LastLoginTime": $user.last_login_time,
-            "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-            "Entity MfaEnabled": "false"
-          }
-        ], $user.is_superuser ? [{
-          "Project": "${projectName}",
-          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Type": "identity", 
-          "Entity Source Type": "user",
-          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Username": $user.username,
-          "Entity Email": $user.username,
-          "Entity - Has Access To Name": "Superuser::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Source ID": "superuser-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Entity Type": "connection",
-          "Entity - Has Access To Source Type": "role", 
-          "Entity - Has Access To Permission Name": "access",
-          "Entity - Has Access To Permission Value": "true",
-          "Entity Status": $user.can_login ? "active" : "inactive",
-          "Entity First Name": $substringBefore($user.username, "."),
-          "Entity Last Name": $substringAfter($user.username, "."),
-          "Entity LastLoginTime": $user.last_login_time,
-          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-          "Entity MfaEnabled": "false"
-        }] : []) ~> $append($user.can_create_role ? [{
-          "Project": "${projectName}",
-          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Type": "identity",
-          "Entity Source Type": "user", 
-          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Username": $user.username,
-          "Entity Email": $user.username,
-          "Entity - Has Access To Name": "Create Role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Source ID": "create-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Entity Type": "connection",
-          "Entity - Has Access To Source Type": "role",
-          "Entity - Has Access To Permission Name": "access", 
-          "Entity - Has Access To Permission Value": "true",
-          "Entity Status": $user.can_login ? "active" : "inactive",
-          "Entity First Name": $substringBefore($user.username, "."),
-          "Entity Last Name": $substringAfter($user.username, "."),
-          "Entity LastLoginTime": $user.last_login_time,
-          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-          "Entity MfaEnabled": "false"
-        }] : []) ~> $append($user.can_create_db ? [{
-          "Project": "${projectName}",
-          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Type": "identity",
-          "Entity Source Type": "user",
-          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region, 
-          "Entity Username": $user.username,
-          "Entity Email": $user.username,
-          "Entity - Has Access To Name": "Create Db::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Source ID": "create-db::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Entity Type": "connection",
-          "Entity - Has Access To Source Type": "role",
-          "Entity - Has Access To Permission Name": "access",
-          "Entity - Has Access To Permission Value": "true", 
-          "Entity Status": $user.can_login ? "active" : "inactive",
-          "Entity First Name": $substringBefore($user.username, "."),
-          "Entity Last Name": $substringAfter($user.username, "."),
-          "Entity LastLoginTime": $user.last_login_time,
-          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-          "Entity MfaEnabled": "false"
-        }] : []) ~> $append($user.can_login ? [{
-          "Project": "${projectName}",
-          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Type": "identity",
-          "Entity Source Type": "user",
-          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Username": $user.username,
-          "Entity Email": $user.username, 
-          "Entity - Has Access To Name": "Login::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Source ID": "login::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Entity Type": "connection",
-          "Entity - Has Access To Source Type": "role",
-          "Entity - Has Access To Permission Name": "access",
-          "Entity - Has Access To Permission Value": "true",
-          "Entity Status": $user.can_login ? "active" : "inactive",
-          "Entity First Name": $substringBefore($user.username, "."), 
-          "Entity Last Name": $substringAfter($user.username, "."),
-          "Entity LastLoginTime": $user.last_login_time,
-          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-          "Entity MfaEnabled": "false"
-        }] : []) ~> $append(!($user.is_superuser or $user.can_create_role or $user.can_create_db or $user.can_login) ? [{
-          "Project": "${projectName}",
-          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Type": "identity",
-          "Entity Source Type": "user",
-          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity Username": $user.username,
-          "Entity Email": $user.username,
-          "Entity - Has Access To Name": "Read::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Source ID": "read::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
-          "Entity - Has Access To Entity Type": "connection",
-          "Entity - Has Access To Source Type": "role", 
-          "Entity - Has Access To Permission Name": "access",
-          "Entity - Has Access To Permission Value": "true",
-          "Entity Status": "inactive",
-          "Entity First Name": $substringBefore($user.username, "."),
-          "Entity Last Name": $substringAfter($user.username, "."),
-          "Entity LastLoginTime": $user.last_login_time,
-          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
-          "Entity MfaEnabled": "false"
-        }] : [])
-      })`;
-
-    if (databases.length > 1) {
-      const transformParts = databases.map((db) => `    ${generateTransformForDb(db.name)}`);
-      return `$append(\n${transformParts.join(',\n')}\n  )`;
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Superuser::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "superuser-role::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_create_role ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Create Role::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "create-role::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_create_db ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Create Db::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "create-db::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_login ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Login::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "login::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          $not(is_superuser or can_create_role or can_create_db or can_login) ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Read::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "read::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": "inactive",
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+    )
+    : []
+  )
+  ~> $flatten()
+)`;
     } else {
-      return `[\n    ${generateTransformForDb(databases[0].name)}\n  ]`;
+      // PostgreSQL transformation
+      return `(
+  $root := $;
+  $keys($root).(
+    $env := $lookup($root, $);
+    ($env.users and $env.connection_info)
+    ?
+    $env.users.(
+      $uname := username;
+      $db := $env.connection_info.db_name;
+      $reg := $env.connection_info.region;
+      $full := $uname & "::" & $db & "::" & $reg;
+      $first := $contains($uname, ".") ? $substringBefore($uname, ".") : $uname;
+      $last := $contains($uname, ".") ? $substringAfter($uname, ".");
+
+      ([])
+        ~> $append(
+          is_superuser ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Superuser::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "superuser-role::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_create_role ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Create Role::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "create-role::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_create_db ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Create Db::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "create-db::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          can_login ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Login::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "login::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": (can_login ? "active" : "inactive"),
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+        ~> $append(
+          $not(is_superuser or can_create_role or can_create_db or can_login) ? [{
+            "Project": "${projectName}",
+            "Entity Name": $full,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $full,
+            "Entity Username": $uname,
+            "Entity Email": $uname,
+            "Entity - Has Access To Name": "Read::" & $db & "::" & $reg,
+            "Entity - Has Access To Source ID": "read::" & $db & "::" & $reg,
+            "Entity - Has Access To Entity Type": "connection",
+            "Entity - Has Access To Source Type": "role",
+            "Entity - Has Access To Permission Name": "access",
+            "Entity - Has Access To Permission Value": true,
+            "Entity Status": "inactive",
+            "Entity First Name": $first,
+            "Entity Last Name": $last ? $last,
+            "Entity LastLoginTime": last_login_time,
+            "Entity LastPasswordChangedTime": last_password_changed_time,
+            "Entity MfaEnabled": false
+          }] : []
+        )
+    )
+    : []
+  )
+  ~> $flatten()
+)`;
     }
   }
 

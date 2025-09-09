@@ -1,5 +1,5 @@
 import { Cron } from 'croner';
-import jsonata from 'jsonata';
+import trutoJsonata from '@truto/truto-jsonata';
 import { Job, Input, Output } from '../types/job-schema';
 import { ConfigWatcher } from './config-watcher';
 import { SecretsWatcher } from './secrets-watcher';
@@ -68,11 +68,11 @@ export class JobRunner {
 
   async start(): Promise<void> {
     await this.configWatcher.start();
-    
+
     if (this.secretsWatcher) {
       await this.secretsWatcher.start();
     }
-    
+
     this.logger.info('Job runner started');
   }
 
@@ -155,7 +155,7 @@ export class JobRunner {
       const duration = Date.now() - startTime;
       execution.status = 'completed';
       execution.duration = duration;
-      execution.result = { recordCount: Array.isArray(transformedData) ? transformedData.length : (transformedData ? 1 : 0) };
+      execution.result = { recordCount: Array.isArray(transformedData) ? transformedData.length : transformedData ? 1 : 0 };
 
       this.logger.info(`Job ${job.id} completed successfully in ${duration}ms`);
     } catch (error) {
@@ -207,7 +207,7 @@ export class JobRunner {
       for (const dbConfig of config) {
         try {
           this.logger.debug(`Executing queries for database: ${dbConfig.name}`);
-          
+
           const connectionInfo = await this.secretsManager.resolveSecret(dbConfig.connection_info);
           const connection = await this.dbManager.getConnection(type, connectionInfo);
 
@@ -224,7 +224,7 @@ export class JobRunner {
 
           for (const query of dbConfig.sql) {
             this.logger.debug(`Executing query '${query.name}' on database '${dbConfig.name}'`);
-            
+
             const data = await connection.query(query.sql);
             this.logger.debug(`Query '${query.name}' on database '${dbConfig.name}' returned ${Array.isArray(data) ? data.length : 'non-array'} results`);
 
@@ -234,14 +234,14 @@ export class JobRunner {
 
           // Add connection_info to the individual database context
           (results[dbConfig.name] as Record<string, unknown>).connection_info = connectionDetails;
-          
+
           this.logger.debug(`Successfully completed queries for database: ${dbConfig.name}`);
         } catch (error) {
           this.logger.error(`Failed to execute queries for database '${dbConfig.name}':`, { error: error instanceof Error ? error.message : String(error) });
           // Continue with other databases instead of stopping entirely
           results[dbConfig.name] = {
             error: error instanceof Error ? error.message : String(error),
-            connection_info: {}
+            connection_info: {},
           };
         }
       }
@@ -259,12 +259,12 @@ export class JobRunner {
 
       // Create nested structure: results[db_name][query_name]
       results[config.name] = {};
-      
+
       for (const query of config.sql) {
         const data = await connection.query(query.sql);
         (results[config.name] as Record<string, unknown>)[query.name] = data;
       }
-      
+
       // Add connection_info to the individual database context
       (results[config.name] as Record<string, unknown>).connection_info = connectionDetails;
     }
@@ -347,18 +347,20 @@ export class JobRunner {
     try {
       this.logger.debug('Input data for transformation:', { data: JSON.stringify(data, null, 2) });
       this.logger.debug('Transform expression:', { expression: transformExpression });
-      
-      const expr = jsonata(transformExpression);
+
+      const expr = trutoJsonata(transformExpression);
       const result = await expr.evaluate(data);
-      
+
       this.logger.debug('Transformation result:', { result: JSON.stringify(result, null, 2) });
       return result;
     } catch (error) {
       this.logger.error('Transformation error details:', {
         error: error instanceof Error ? error.message : String(error),
+        errorObject: error,
+        errorString: JSON.stringify(error, null, 2),
         stack: error instanceof Error ? error.stack : undefined,
         data: JSON.stringify(data, null, 2),
-        expression: transformExpression
+        expression: transformExpression,
       });
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Transformation failed: ${errorMessage}`);
@@ -394,13 +396,13 @@ export class JobRunner {
   private async handleSecretsChange(): Promise<void> {
     try {
       this.logger.info('Secrets changed, reloading and invalidating connections...');
-      
+
       // Reload secrets with validation
       await this.secretsManager.reloadSecrets();
-      
+
       // Close all database connections to force recreation with new credentials
       await this.dbManager.closeAllConnections();
-      
+
       this.logger.info('Secrets reloaded successfully, connections will be recreated as needed');
     } catch (error) {
       this.logger.error('Failed to reload secrets:', { error: error instanceof Error ? error.message : String(error) });
@@ -431,11 +433,11 @@ export class JobRunner {
     }
 
     this.configWatcher.stop();
-    
+
     if (this.secretsWatcher) {
       this.secretsWatcher.stop();
     }
-    
+
     await this.dbManager.closeAll();
 
     this.logger.info('Job runner stopped');
