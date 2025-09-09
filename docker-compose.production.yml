@@ -45,12 +45,10 @@ services:
       - ./querybird-data/logs:/app/.querybird/logs
       # Workspace for local files
       - ./:/workspace
-      # Optional: External secrets directory
-      # - /opt/querybird-secrets:/external-secrets
     networks:
       - querybird-network
     working_dir: /workspace
-    entrypoint: ['bun', 'run', 'dist/main-runner.js']
+    entrypoint: ['/app/dist/main-runner.js']
 
 networks:
   querybird-network:
