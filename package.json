@@ -1,6 +1,6 @@
 {
   "name": "@trutohq/querybird",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "QueryBird - Containerized job scheduler for database queries with Docker-first deployment",
   "main": "dist/main-runner.js",
   "type": "module",
