@@ -30,12 +30,12 @@ export class ConfigFromSecrets {
   private async generateConfig(configDir: string, jobId: string, dbType: 'postgres' | 'mysql', externalSecretsFile?: string): Promise<void> {
     // Load existing secrets
     let secrets = await this.secretsManager.loadSecrets();
-    
+
     // If external secrets file is provided, merge the job-specific secrets from it
     if (externalSecretsFile) {
       secrets = await this.mergeExternalSecrets(secrets, jobId, externalSecretsFile);
     }
-    
+
     let jobSecrets = (secrets as any)[jobId];
 
     if (!jobSecrets) {
@@ -57,13 +57,15 @@ export class ConfigFromSecrets {
     }
 
     // Get database configurations
-    const databases = Object.keys(jobSecrets.database).map(name => ({
+    const databases = Object.keys(jobSecrets.database).map((name) => ({
       name,
-      config: jobSecrets.database[name]
+      config: jobSecrets.database[name],
     }));
 
-    // Build outputs based on existing secrets
-    const outputs = this.buildOutputsFromSecrets(jobId, jobSecrets);
+    // Build outputs based on existing secrets and prompt for new ones
+    const outputResult = await this.buildOutputsFromSecrets(jobId, jobSecrets, secrets);
+    const outputs = outputResult.outputs;
+    const webhookUpdatedSecrets = outputResult.updatedSecrets;
 
     // Generate config file
     await this.generateConfigFile(configDir, jobId, metadata, databases, outputs, dbType);
@@ -74,6 +76,9 @@ export class ConfigFromSecrets {
     if (updatedSecrets) {
       console.log(`✅ Secrets updated with missing integration ID`);
     }
+    if (webhookUpdatedSecrets) {
+      console.log(`✅ Secrets updated with webhook configuration`);
+    }
     console.log('\n🏃 You can now run your job with:');
     console.log(`   querybird run-once --job-id ${jobId}`);
   }
@@ -83,6 +88,16 @@ export class ConfigFromSecrets {
     console.log('===================\n');
     console.log(`Job ID: ${jobId} (using existing secrets)\n`);
 
+    // Check if running non-interactively (no TTY)
+    if (!process.stdin.isTTY) {
+      console.log('Non-interactive mode detected, using default values');
+      return {
+        name: `${jobId} Job`,
+        description: 'Export user data from database',
+        schedule: '0 2 * * *',
+      };
+    }
+
     const name = await this.promptForInput('Job Name (e.g., Daily User Export)', 'string', true);
     const description = await this.promptForInput('Job Description', 'string', false, 'Export user data from database');
     const schedule = await this.promptForInput('Cron Schedule (e.g., 0 2 * * * for daily at 2 AM)', 'string', false, '0 2 * * *');
@@ -91,6 +106,12 @@ export class ConfigFromSecrets {
   }
 
   private async checkAndCollectMissingSecrets(secrets: SecretsConfig, jobId: string, jobSecrets: any): Promise<SecretsConfig | null> {
+    // Skip interactive prompts in non-TTY mode
+    if (!process.stdin.isTTY) {
+      console.log('Non-interactive mode: skipping Balkan ID configuration');
+      return null;
+    }
+
     let needsUpdate = false;
     let updatedSecrets = { ...secrets };
     const updatedJobSecrets = { ...jobSecrets };
@@ -100,12 +121,12 @@ export class ConfigFromSecrets {
     if (!globalBalkan?.balkan_key_id || !globalBalkan?.balkan_key_secret) {
       console.log('\n🔑 Global Balkan API credentials not found');
       const hasBalkan = await this.promptForConfirmation('Do you want to configure Balkan ID integration?', false);
-      
+
       if (hasBalkan) {
         console.log('Please configure global Balkan API credentials:');
         const keyId = await this.promptForInput('Balkan API Key ID', 'string', true);
         const keySecret = await this.promptForInput('Balkan API Key Secret', 'password', true);
-        
+
         if (!(updatedSecrets as any).balkan) {
           (updatedSecrets as any).balkan = {};
         }
@@ -118,10 +139,10 @@ export class ConfigFromSecrets {
 
     // Check for integration ID if global Balkan exists or was just configured
     const balkanExists = (updatedSecrets as any).balkan?.balkan_key_id && (updatedSecrets as any).balkan?.balkan_key_secret;
-    if (balkanExists && (!jobSecrets.api_keys?.balkan_integration_id)) {
+    if (balkanExists && !jobSecrets.api_keys?.balkan_integration_id) {
       console.log('\n🔗 Balkan Integration Configuration');
       const integrationId = await this.promptForInput('Balkan Integration ID', 'string', true);
-      
+
       if (!updatedJobSecrets.api_keys) updatedJobSecrets.api_keys = {};
       updatedJobSecrets.api_keys.balkan_integration_id = integrationId;
       (updatedSecrets as any)[jobId] = updatedJobSecrets;
@@ -149,11 +170,39 @@ export class ConfigFromSecrets {
     return value.startsWith('y');
   }
 
-  private buildOutputsFromSecrets(jobId: string, jobSecrets: any): any[] {
+  private async buildOutputsFromSecrets(jobId: string, jobSecrets: any, secrets: SecretsConfig): Promise<{ outputs: any[]; updatedSecrets?: SecretsConfig }> {
     const outputs: any[] = [];
+    let updatedSecrets: SecretsConfig | undefined;
+    let needsUpdate = false;
+
+    // Check for existing webhook configuration
+    let hasWebhookInSecrets = jobSecrets.webhooks?.webhook_url;
+
+    // If no webhook configured, prompt to add one (skip in non-interactive mode)
+    if (!hasWebhookInSecrets && process.stdin.isTTY) {
+      console.log('\n📤 Output Configuration');
+      const hasWebhook = await this.promptForConfirmation('Do you want to send data to a webhook?', false);
+
+      if (hasWebhook) {
+        const webhookUrl = await this.promptForInput('Webhook URL', 'url', true);
+
+        // Update job secrets with webhook configuration
+        if (!updatedSecrets) {
+          updatedSecrets = { ...secrets };
+        }
+        const updatedJobSecrets = { ...(updatedSecrets as any)[jobId] };
+        if (!updatedJobSecrets.webhooks) updatedJobSecrets.webhooks = {};
+        updatedJobSecrets.webhooks.webhook_url = webhookUrl;
+        (updatedSecrets as any)[jobId] = updatedJobSecrets;
+        needsUpdate = true;
+        hasWebhookInSecrets = true;
+
+        console.log('✅ Webhook URL will be saved to secrets');
+      }
+    }
 
     // Add webhook output if configured
-    if (jobSecrets.webhooks?.webhook_url) {
+    if (hasWebhookInSecrets) {
       outputs.push({
         type: 'webhook',
         endpoint: `!secrets ${jobId}.webhooks.webhook_url`,
@@ -167,7 +216,7 @@ export class ConfigFromSecrets {
     }
 
     // Add Balkan ID output if configured
-    if (jobSecrets.api_keys?.balkan_integration_id) {
+    if (jobSecrets.api_keys?.balkan_integration_id || (updatedSecrets as any)?.[jobId]?.api_keys?.balkan_integration_id) {
       outputs.push({
         type: 'http',
         endpoint: 'https://app.balkan.id/api/rest/v0/entitlements/upload-url',
@@ -186,17 +235,14 @@ export class ConfigFromSecrets {
       });
     }
 
-    return outputs;
+    if (needsUpdate && updatedSecrets) {
+      await this.secretsManager.saveSecrets(updatedSecrets);
+    }
+
+    return { outputs, updatedSecrets: needsUpdate ? updatedSecrets : undefined };
   }
 
-  private async generateConfigFile(
-    configDir: string, 
-    jobId: string, 
-    metadata: JobMetadata, 
-    databases: Array<{name: string, config: any}>, 
-    outputs: any[], 
-    dbType: 'postgres' | 'mysql'
-  ): Promise<void> {
+  private async generateConfigFile(configDir: string, jobId: string, metadata: JobMetadata, databases: Array<{ name: string; config: any }>, outputs: any[], dbType: 'postgres' | 'mysql'): Promise<void> {
     await mkdir(configDir, { recursive: true });
 
     const input: any = {};
@@ -276,139 +322,131 @@ export class ConfigFromSecrets {
     }
   }
 
-  private generateTransform(databases: Array<{name: string, config: any}>, projectName: string): string {
-    const generateTransformForDb = (dbName: string) => 
-      `(${dbName}.users ? ${dbName}.users[
-      {
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity",
-        "Entity Source Type": "user",
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Username": username,
-        "Entity Email": username,
-        "Entity Status": can_login ? "active" : "inactive",
-        "Entity First Name": $substringBefore(username, "."),
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }
-    ] ~> $append(
-      is_superuser ? [{
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity", 
-        "Entity Source Type": "user",
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Username": username,
-        "Entity Email": username,
-        "Entity - Has Access To Name": "Superuser::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Source ID": "superuser-role::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Entity Type": "connection",
-        "Entity - Has Access To Source Type": "role", 
-        "Entity - Has Access To Permission Name": "access",
-        "Entity - Has Access To Permission Value": "true",
-        "Entity Status": can_login ? "active" : "inactive",
-        "Entity First Name": $substringBefore(username, "."),
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }] : []
-    ) ~> $append(
-      can_create_role ? [{
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity",
-        "Entity Source Type": "user", 
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Username": username,
-        "Entity Email": username,
-        "Entity - Has Access To Name": "Create Role::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Source ID": "create-role::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Entity Type": "connection",
-        "Entity - Has Access To Source Type": "role",
-        "Entity - Has Access To Permission Name": "access", 
-        "Entity - Has Access To Permission Value": "true",
-        "Entity Status": can_login ? "active" : "inactive",
-        "Entity First Name": $substringBefore(username, "."),
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }] : []
-    ) ~> $append(
-      can_create_db ? [{
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity",
-        "Entity Source Type": "user",
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region, 
-        "Entity Username": username,
-        "Entity Email": username,
-        "Entity - Has Access To Name": "Create Db::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Source ID": "create-db::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Entity Type": "connection",
-        "Entity - Has Access To Source Type": "role",
-        "Entity - Has Access To Permission Name": "access",
-        "Entity - Has Access To Permission Value": "true", 
-        "Entity Status": can_login ? "active" : "inactive",
-        "Entity First Name": $substringBefore(username, "."),
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }] : []
-    ) ~> $append(
-      can_login ? [{
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity",
-        "Entity Source Type": "user",
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Username": username,
-        "Entity Email": username, 
-        "Entity - Has Access To Name": "Login::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Source ID": "login::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Entity Type": "connection",
-        "Entity - Has Access To Source Type": "role",
-        "Entity - Has Access To Permission Name": "access",
-        "Entity - Has Access To Permission Value": "true",
-        "Entity Status": can_login ? "active" : "inactive",
-        "Entity First Name": $substringBefore(username, "."), 
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }] : []
-    ) ~> $append(
-      !(is_superuser or can_create_role or can_create_db or can_login) ? [{
-        "Project": "${projectName}",
-        "Entity Name": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Type": "identity",
-        "Entity Source Type": "user",
-        "Entity Source ID": username & "::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity Username": username,
-        "Entity Email": username,
-        "Entity - Has Access To Name": "Read::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Source ID": "read::" & $$.${dbName}.connection_info.db_name & "::" & $$.${dbName}.connection_info.region,
-        "Entity - Has Access To Entity Type": "connection",
-        "Entity - Has Access To Source Type": "role", 
-        "Entity - Has Access To Permission Name": "access",
-        "Entity - Has Access To Permission Value": "true",
-        "Entity Status": "inactive",
-        "Entity First Name": $substringBefore(username, "."),
-        "Entity Last Name": $substringAfter(username, "."),
-        "Entity LastLoginTime": last_login_time,
-        "Entity LastPasswordChangedTime": last_password_changed_time,
-        "Entity MfaEnabled": "false"
-      }] : []
-    ) : [])`;
+  private generateTransform(databases: Array<{ name: string; config: any }>, projectName: string): string {
+    const generateTransformForDb = (dbName: string) =>
+      `$map(${dbName}.users, function($user) {
+        $append([
+          {
+            "Project": "${projectName}",
+            "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+            "Entity Type": "identity",
+            "Entity Source Type": "user",
+            "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+            "Entity Username": $user.username,
+            "Entity Email": $user.username,
+            "Entity Status": $user.can_login ? "active" : "inactive",
+            "Entity First Name": $substringBefore($user.username, "."),
+            "Entity Last Name": $substringAfter($user.username, "."),
+            "Entity LastLoginTime": $user.last_login_time,
+            "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+            "Entity MfaEnabled": "false"
+          }
+        ], $user.is_superuser ? [{
+          "Project": "${projectName}",
+          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity", 
+          "Entity Source Type": "user",
+          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": $user.username,
+          "Entity Email": $user.username,
+          "Entity - Has Access To Name": "Superuser::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "superuser-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role", 
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": $user.can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore($user.username, "."),
+          "Entity Last Name": $substringAfter($user.username, "."),
+          "Entity LastLoginTime": $user.last_login_time,
+          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []) ~> $append($user.can_create_role ? [{
+          "Project": "${projectName}",
+          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user", 
+          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": $user.username,
+          "Entity Email": $user.username,
+          "Entity - Has Access To Name": "Create Role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "create-role::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access", 
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": $user.can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore($user.username, "."),
+          "Entity Last Name": $substringAfter($user.username, "."),
+          "Entity LastLoginTime": $user.last_login_time,
+          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []) ~> $append($user.can_create_db ? [{
+          "Project": "${projectName}",
+          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region, 
+          "Entity Username": $user.username,
+          "Entity Email": $user.username,
+          "Entity - Has Access To Name": "Create Db::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "create-db::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true", 
+          "Entity Status": $user.can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore($user.username, "."),
+          "Entity Last Name": $substringAfter($user.username, "."),
+          "Entity LastLoginTime": $user.last_login_time,
+          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []) ~> $append($user.can_login ? [{
+          "Project": "${projectName}",
+          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": $user.username,
+          "Entity Email": $user.username, 
+          "Entity - Has Access To Name": "Login::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "login::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role",
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": $user.can_login ? "active" : "inactive",
+          "Entity First Name": $substringBefore($user.username, "."), 
+          "Entity Last Name": $substringAfter($user.username, "."),
+          "Entity LastLoginTime": $user.last_login_time,
+          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : []) ~> $append(!($user.is_superuser or $user.can_create_role or $user.can_create_db or $user.can_login) ? [{
+          "Project": "${projectName}",
+          "Entity Name": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Type": "identity",
+          "Entity Source Type": "user",
+          "Entity Source ID": $user.username & "::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity Username": $user.username,
+          "Entity Email": $user.username,
+          "Entity - Has Access To Name": "Read::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Source ID": "read::" & ${dbName}.connection_info.db_name & "::" & ${dbName}.connection_info.region,
+          "Entity - Has Access To Entity Type": "connection",
+          "Entity - Has Access To Source Type": "role", 
+          "Entity - Has Access To Permission Name": "access",
+          "Entity - Has Access To Permission Value": "true",
+          "Entity Status": "inactive",
+          "Entity First Name": $substringBefore($user.username, "."),
+          "Entity Last Name": $substringAfter($user.username, "."),
+          "Entity LastLoginTime": $user.last_login_time,
+          "Entity LastPasswordChangedTime": $user.last_password_changed_time,
+          "Entity MfaEnabled": "false"
+        }] : [])
+      })`;
 
     if (databases.length > 1) {
-      const transformParts = databases.map(db => `    ${generateTransformForDb(db.name)}`);
-      return `[\n${transformParts.join(',\n')}\n  ]`;
+      const transformParts = databases.map((db) => `    ${generateTransformForDb(db.name)}`);
+      return `$append(\n${transformParts.join(',\n')}\n  )`;
     } else {
       return `[\n    ${generateTransformForDb(databases[0].name)}\n  ]`;
     }
@@ -464,50 +502,49 @@ export class ConfigFromSecrets {
   private async mergeExternalSecrets(mainSecrets: SecretsConfig, jobId: string, externalSecretsFile: string): Promise<SecretsConfig> {
     try {
       this.logger.info(`📂 Loading external secrets from: ${externalSecretsFile}`);
-      
+
       // Load external secrets file
       const externalSecretsManager = new ImprovedSecretsManager(externalSecretsFile);
       const externalSecrets = await externalSecretsManager.loadSecrets();
-      
+
       // Check if job ID exists in external file
       const externalJobSecrets = (externalSecrets as any)[jobId];
       if (!externalJobSecrets) {
         throw new Error(`Job ID "${jobId}" not found in external secrets file: ${externalSecretsFile}`);
       }
-      
+
       this.logger.info(`✅ Found job "${jobId}" in external secrets file`);
-      
+
       // Validate external job secrets structure
       if (!externalJobSecrets.database || Object.keys(externalJobSecrets.database).length === 0) {
         throw new Error(`Job ID "${jobId}" in external secrets file has no database configurations`);
       }
-      
+
       // Count databases being imported
       const dbCount = Object.keys(externalJobSecrets.database).length;
       this.logger.info(`🔄 Importing ${dbCount} database configuration(s) for job "${jobId}"`);
-      
+
       // Create updated main secrets with merged job data
       const updatedSecrets = { ...mainSecrets };
       (updatedSecrets as any)[jobId] = {
         database: { ...externalJobSecrets.database },
         api_keys: { ...externalJobSecrets.api_keys },
         webhooks: { ...externalJobSecrets.webhooks },
-        ...(externalJobSecrets.config && { config: { ...externalJobSecrets.config } })
+        ...(externalJobSecrets.config && { config: { ...externalJobSecrets.config } }),
       };
-      
+
       // Note: Global Balkan API keys are only used from the main secrets.json file
       // and are never imported from external secrets files
-      
+
       // Save the merged secrets to the main secrets file
       await this.secretsManager.saveSecrets(updatedSecrets);
       this.logger.info(`💾 Successfully merged and saved secrets for job "${jobId}"`);
-      
+
       // List imported databases for user confirmation
       const dbNames = Object.keys(externalJobSecrets.database);
       this.logger.info(`📋 Imported databases: ${dbNames.join(', ')}`);
-      
+
       return updatedSecrets;
-      
     } catch (error) {
       if (error instanceof Error && error.message.includes('ENOENT')) {
         throw new Error(`External secrets file not found: ${externalSecretsFile}`);

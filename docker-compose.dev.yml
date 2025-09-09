@@ -1,0 +1,123 @@
+services:
+  querybird-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: querybird-dev
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src:ro
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      # Configuration and secrets
+      - ./.querybird:/app/.querybird
+      # Mount current directory for development
+      - ./:/workspace
+    networks:
+      - querybird-dev-network
+    ports:
+      - "8080:8080"  # Health check/debugging endpoint
+    command: ["bun", "--hot", "src/main-runner.ts", "start", "--log-level", "debug"]
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-staging:
+        condition: service_healthy
+
+  # Development databases (from existing docker-compose.test.yml)
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: querybird-dev-postgres-primary
+    environment:
+      POSTGRES_DB: querybird_prod
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password_123
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_primary_dev_data:/var/lib/postgresql/data
+      - ./init-scripts/init-primary.sql:/docker-entrypoint-initdb.d/01-init-primary.sql
+    networks:
+      - querybird-dev-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d querybird_prod']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-staging:
+    image: postgres:15-alpine
+    container_name: querybird-dev-postgres-staging
+    environment:
+      POSTGRES_DB: querybird_staging
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password_123
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_staging_dev_data:/var/lib/postgresql/data
+      - ./init-scripts/init-staging.sql:/docker-entrypoint-initdb.d/01-init-staging.sql
+    networks:
+      - querybird-dev-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d querybird_staging']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-test:
+    image: mysql:8.0
+    container_name: querybird-dev-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_123
+      MYSQL_DATABASE: querybird_mysql
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin_password_123
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./init-scripts/init-mysql.sql:/docker-entrypoint-initdb.d/01-init-mysql.sql
+    networks:
+      - querybird-dev-network
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'admin', '-padmin_password_123']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: querybird-dev-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@querybird.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - '8081:80'
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    networks:
+      - querybird-dev-network
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-staging:
+        condition: service_healthy
+
+volumes:
+  postgres_primary_dev_data:
+  postgres_staging_dev_data:
+  mysql_dev_data:
+  pgadmin_dev_data:
+
+networks:
+  querybird-dev-network:
+    driver: bridge

@@ -106,49 +106,57 @@ transform: |-
 
 The `connection_info` is parsed from your database connection configuration and supports both JSON and URL formats.
 
-## Installation (Developers)
+## Development Setup
 
-### From Source
+### Docker Development
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/querybird.git
 cd querybird
-bun install
-bun run build
+
+# Start development environment
+npm run dev:docker
+
+# View development logs
+npm run dev:docker:logs
 ```
 
-### Using Bun
+### Building from Source (Docker)
 
 ```bash
-# Install globally
-bun install -g @trutohq/querybird
+# Build production image
+npm run docker:build
 
-# Or run directly
-bunx @trutohq/querybird
+# Or use docker-compose
+docker-compose build
 ```
-
-### Binary Installation
-
-Download binaries from Releases and pick for your OS/CPU:
-
-- Linux: `querybird-linux-x64` or `querybird-linux-arm64`
-- macOS: `querybird-darwin-x64` or `querybird-darwin-arm64`
-- Windows: `querybird-windows-x64.exe` or `querybird-windows-arm64.exe`
-
-Make executable and place on PATH as needed.
 
 ## Usage
 
 ### Start the Scheduler
 
 ```bash
-bun run start --config-dir ./configs --secrets-dir ./secrets
+# Using Docker Compose (recommended)
+docker-compose up -d
+
+# Using wrapper script
+querybird start
+
+# Using Docker directly
+docker run -d --name querybird -v ~/.querybird:/app/.querybird --network host querybird:latest
 ```
 
 ### Run a Job Once
 
 ```bash
-bun run run-once --job-id example-job --config-dir ./configs --secrets-dir ./secrets
+# Using wrapper script
+querybird run-once --job-id example-job
+
+# Using Docker Compose
+docker-compose run --rm querybird-cli run-once --job-id example-job
+
+# Using Docker directly
+docker run --rm -v ~/.querybird:/app/.querybird querybird:latest run-once --job-id example-job
 ```
 
 ## Configuration

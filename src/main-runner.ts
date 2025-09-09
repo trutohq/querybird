@@ -68,7 +68,14 @@ program
       await mkdir(configDir, { recursive: true });
       await mkdir(secretsDir, { recursive: true });
       await mkdir(paths.watermarks, { recursive: true });
-      await mkdir(paths.outputs, { recursive: true });
+      try {
+        await mkdir(paths.outputs, { recursive: true });
+      } catch (error) {
+        // Ignore EEXIST errors for outputs directory
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+      }
 
       const runner = new JobRunner({
         configDir: configDir,
@@ -405,6 +412,39 @@ secretsCommand
       await collector.collectWebhooks();
     } catch (error) {
       console.error('Failed to setup webhooks:', error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('health')
+  .description('Health check for Docker containers')
+  .action(async () => {
+    try {
+      const paths = getQueryBirdPaths();
+
+      // Check if config directory exists and has configs
+      const configExists = await access(paths.configs)
+        .then(() => true)
+        .catch(() => false);
+      if (!configExists) {
+        console.error('❌ Config directory not found');
+        process.exit(1);
+      }
+
+      // Check if secrets file exists
+      const secretsExists = await access(paths.secretsFile)
+        .then(() => true)
+        .catch(() => false);
+      if (!secretsExists) {
+        console.error('❌ Secrets file not found');
+        process.exit(1);
+      }
+
+      console.log('✅ QueryBird health check passed');
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Health check failed:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });

@@ -1,0 +1,82 @@
+services:
+  querybird:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: querybird
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      # Configuration and secrets
+      - querybird_configs:/app/.querybird/configs
+      - querybird_secrets:/app/.querybird/secrets
+      - querybird_logs:/app/.querybird/logs
+      # Optional: Mount host directories for easier management
+      # - ~/.querybird/configs:/app/.querybird/configs
+      # - ~/.querybird/secrets:/app/.querybird/secrets
+      # - ~/.querybird/logs:/app/.querybird/logs
+    networks:
+      - querybird-network
+    # Uncomment if you need to expose health check endpoint
+    # ports:
+    #   - "8080:8080"
+    healthcheck:
+      test: ['CMD', 'bun', 'run', 'dist/main-runner.js', 'health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - postgres
+    command: ['start']
+
+  # Optional: Include database for complete stack
+  postgres:
+    image: postgres:15-alpine
+    container_name: querybird-postgres
+    environment:
+      POSTGRES_DB: querybird
+      POSTGRES_USER: querybird
+      POSTGRES_PASSWORD: querybird_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - querybird-network
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U querybird -d querybird']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CLI service for running commands
+  querybird-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ['cli']
+    environment:
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      - ~/.querybird:/app/.querybird
+      - ./:/workspace
+      # Optional: Mount external secrets directory
+      - ./:/external-secrets
+    networks:
+      - querybird-network
+    working_dir: /workspace
+    entrypoint: ['bun', 'run', 'dist/main-runner.js']
+
+volumes:
+  querybird_configs:
+  querybird_secrets:
+  querybird_logs:
+  postgres_data:
+
+networks:
+  querybird-network:
+    driver: bridge

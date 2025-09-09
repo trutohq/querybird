@@ -1,0 +1,218 @@
+name: Docker Release to GitHub Container Registry
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (optional, will use package.json if not provided)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      new-version: ${{ steps.version-check.outputs.version }}
+      should-release: ${{ steps.should-release.outputs.release }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get version from input or package.json
+        id: get-version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual version: $VERSION"
+          else
+            VERSION=$(grep '"version"' package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+            echo "Using package.json version: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check version change
+        id: version-check
+        run: |
+          CURRENT_VERSION="${{ steps.get-version.outputs.version }}"
+          echo "Current version: $CURRENT_VERSION"
+
+          # For manual dispatch, always consider version changed
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch - forcing release"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For push events, check if version actually changed
+          if [ "${{ github.event_name }}" = "push" ]; then
+            PREVIOUS_VERSION=""
+            if git show HEAD~1:package.json 2>/dev/null | grep -q '"version"'; then
+              PREVIOUS_VERSION=$(git show HEAD~1:package.json | grep '"version"' | sed 's/.*"version": "\(.*\)".*/\1/')
+              echo "Previous version: $PREVIOUS_VERSION"
+            fi
+
+            if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ] && [ -n "$PREVIOUS_VERSION" ]; then
+              echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "Version unchanged"
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Should release?
+        id: should-release
+        run: |
+          # Release if:
+          # 1. Manual workflow dispatch
+          # 2. Version changed on main branch push
+          # 3. GitHub release event
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+             [ "${{ github.event_name }}" = "release" ] || \
+             ([ "${{ github.event_name }}" = "push" ] && [ "${{ steps.version-check.outputs.changed }}" = "true" ]); then
+            echo "release=true" >> $GITHUB_OUTPUT
+            echo "Will create release"
+          else
+            echo "release=false" >> $GITHUB_OUTPUT
+            echo "No release needed"
+          fi
+
+  build-and-push:
+    needs: check-version
+    runs-on: ubuntu-latest
+    if: needs.check-version.outputs.should-release == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}},value=v${{ needs.check-version.outputs.new-version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.check-version.outputs.new-version }}
+            type=semver,pattern={{major}},value=v${{ needs.check-version.outputs.new-version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.check-version.outputs.new-version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-github-release:
+    needs: [check-version, build-and-push]
+    runs-on: ubuntu-latest
+    if: needs.check-version.outputs.should-release == 'true' && github.event_name != 'release'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          VERSION: ${{ needs.check-version.outputs.new-version }}
+        run: |
+          # Get commits since last tag (if any)
+          LAST_TAG=$(git tag --sort=-version:refname | head -1 2>/dev/null || echo "")
+          
+          if [ -n "$LAST_TAG" ] && [ "$LAST_TAG" != "v$VERSION" ]; then
+            echo "Generating changelog since $LAST_TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$LAST_TAG..HEAD" --no-merges)
+          else
+            echo "Generating changelog for initial release"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+
+          # Create release body
+          cat > release_body.md << EOF
+          ## QueryBird v$VERSION - Docker Release
+
+          ### 🐳 Docker Images Available
+          
+          Pull the latest images:
+          \`\`\`bash
+          # Latest version
+          docker pull ghcr.io/${{ github.repository }}:latest
+          
+          # Specific version
+          docker pull ghcr.io/${{ github.repository }}:v$VERSION
+          \`\`\`
+
+          ### 🚀 Quick Start
+          
+          \`\`\`bash
+          # Create docker-compose.yml with the new image
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.production.yml > docker-compose.yml
+          
+          # Start QueryBird
+          docker-compose up -d
+          
+          # Setup your first job
+          docker-compose run --rm querybird-cli init-postgres
+          \`\`\`
+
+          ### 📋 Changes in this Release
+          $CHANGELOG
+
+          ### 📚 Documentation
+          - [Docker Setup Guide](https://github.com/${{ github.repository }}/blob/main/DOCKER.md)
+          - [Production Deployment](https://github.com/${{ github.repository }}/blob/main/README.md#production-deployment)
+          - [Configuration Examples](https://github.com/${{ github.repository }}/blob/main/SECRETS.md)
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          name: QueryBird v${{ needs.check-version.outputs.new-version }}
+          body_path: release_body.md
+          draft: false
+          prerelease: false
+          make_latest: true

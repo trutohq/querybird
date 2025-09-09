@@ -1,0 +1,39 @@
+# Development Dockerfile with hot reload
+FROM oven/bun:1.1-alpine AS development
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create non-root user
+RUN addgroup -g 1001 -S querybird && \
+    adduser -S querybird -u 1001 -G querybird
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install all dependencies (including dev dependencies)
+RUN bun install --frozen-lockfile
+
+# Create directories for configs, secrets, and logs
+RUN mkdir -p .querybird/configs .querybird/secrets .querybird/logs && \
+    chown -R querybird:querybird .querybird
+
+# Switch to non-root user
+USER querybird
+
+# Set environment variables
+ENV NODE_ENV=development
+ENV QB_CONFIG_DIR=/app/.querybird
+ENV LOG_LEVEL=debug
+
+# Expose health check/debugging endpoint
+EXPOSE 8080
+
+# Use dumb-init as entrypoint for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Default command (will be overridden in docker-compose.dev.yml)
+CMD ["bun", "--hot", "src/main-runner.ts", "start", "--log-level", "debug"]

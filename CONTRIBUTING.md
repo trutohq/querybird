@@ -18,8 +18,12 @@ Thank you for your interest in contributing to QueryBird! This document provides
    git clone https://github.com/YOUR_USERNAME/querybird.git
    cd querybird
    ```
-3. Install dependencies:
+3. Set up development environment:
    ```bash
+   # Start Docker development environment
+   npm run dev:docker
+   
+   # Or install dependencies for local development
    bun install
    ```
 4. Create a new branch for your feature:
@@ -79,7 +83,7 @@ src/
 
 configs/            # Example configuration files
 scripts/            # Build and utility scripts
-install/            # Installation scripts
+docker/             # Docker configuration files
 ```
 
 ## Making Changes
@@ -129,7 +133,7 @@ Examples:
 
 - `feat(core): add support for MySQL connections`
 - `fix(utils): resolve memory leak in logger`
-- `docs(readme): update installation instructions`
+- `docs(readme): update Docker deployment instructions`
 
 ### Pull Request Guidelines
 

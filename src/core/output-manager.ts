@@ -5,15 +5,11 @@ import { Logger } from '../utils/logger';
 import { Output } from '../types/job-schema';
 
 export class OutputManager {
-  constructor(
-    private secretsManager: ImprovedSecretsManager,
-    private logger: Logger,
-    private outputDir: string = './outputs'
-  ) {}
+  constructor(private secretsManager: ImprovedSecretsManager, private logger: Logger, private outputDir: string = './outputs') {}
 
   async send(data: unknown, output: Output): Promise<void> {
     const resolvedOutput = await this.resolveSecrets(output);
-    
+
     switch (resolvedOutput.type) {
       case 'webhook':
       case 'http':
@@ -32,11 +28,11 @@ export class OutputManager {
 
   private async resolveSecrets(output: Output): Promise<Output> {
     const resolved = { ...output };
-    
+
     if (resolved.endpoint) {
       resolved.endpoint = await this.secretsManager.resolveSecret(resolved.endpoint);
     }
-    
+
     if (resolved.headers) {
       if (typeof resolved.headers === 'string') {
         resolved.headers = await this.secretsManager.resolveSecret(resolved.headers);
@@ -80,18 +76,17 @@ export class OutputManager {
 
     // The upload_url type now reuses standard HTTP fields (endpoint, headers, body, query_params)
     // so no additional resolution needed
-    
+
     if (resolved.bucket) {
       resolved.bucket = await this.secretsManager.resolveSecret(resolved.bucket);
     }
-    
+
     if (resolved.path) {
       resolved.path = await this.secretsManager.resolveSecret(resolved.path);
     }
-    
+
     return resolved;
   }
-
 
   private async sendHttp(data: unknown, output: Output): Promise<void> {
     if (!output.endpoint) {
@@ -107,7 +102,7 @@ export class OutputManager {
     // Single-step HTTP request
     const url = this.buildUrl(output.endpoint, output.query_params);
     const method = output.method || 'POST';
-    
+
     // Determine payload and headers
     let payload: string | undefined;
     let headers: Record<string, string> = {};
@@ -128,13 +123,13 @@ export class OutputManager {
     }
 
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= output.retryCount; attempt++) {
       try {
         const response = await fetch(url, {
           method,
           headers,
-          body: payload
+          body: payload,
         });
 
         if (!response.ok) {
@@ -143,13 +138,12 @@ export class OutputManager {
 
         this.logger.info(`Successfully sent ${method} request to ${url}`);
         return;
-        
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(`HTTP output attempt ${attempt}/${output.retryCount} failed:`, { error: error instanceof Error ? error.message : String(error) });
-        
+
         if (attempt < output.retryCount) {
-          await new Promise(resolve => setTimeout(resolve, output.retryDelay));
+          await new Promise((resolve) => setTimeout(resolve, output.retryDelay));
         }
       }
     }
@@ -164,7 +158,7 @@ export class OutputManager {
 
     // Step 1: Get the upload URL
     const uploadUrlResponse = await this.getUploadUrl(output);
-    
+
     // Step 2: Upload the data to the returned URL
     const uploadMethod = output.upload_method || 'POST';
     let payload: string | undefined;
@@ -176,13 +170,13 @@ export class OutputManager {
     }
 
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= output.retryCount; attempt++) {
       try {
         const response = await fetch(uploadUrlResponse.upload_url, {
           method: uploadMethod,
           headers: uploadHeaders,
-          body: payload
+          body: payload,
         });
 
         if (!response.ok) {
@@ -191,13 +185,12 @@ export class OutputManager {
 
         this.logger.info(`Successfully uploaded data to ${uploadUrlResponse.upload_url} using ${uploadMethod}`);
         return;
-        
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(`Upload attempt ${attempt}/${output.retryCount} failed:`, { error: error instanceof Error ? error.message : String(error) });
-        
+
         if (attempt < output.retryCount) {
-          await new Promise(resolve => setTimeout(resolve, output.retryDelay));
+          await new Promise((resolve) => setTimeout(resolve, output.retryDelay));
         }
       }
     }
@@ -208,7 +201,7 @@ export class OutputManager {
   private async getUploadUrl(output: Output): Promise<{ upload_url: string }> {
     const url = this.buildUrl(output.endpoint!, output.query_params);
     const method = output.method || 'POST';
-    
+
     let payload: string | undefined;
     let headers: Record<string, string> = {};
     if (output.headers && typeof output.headers === 'object' && !Array.isArray(output.headers)) {
@@ -222,11 +215,10 @@ export class OutputManager {
       }
     }
 
-
     const response = await fetch(url, {
       method,
       headers,
-      body: payload
+      body: payload,
     });
 
     if (!response.ok) {
@@ -234,15 +226,15 @@ export class OutputManager {
     }
 
     const responseData = await response.json();
-    
+
     const urlField = output.response_url_field || 'url';
-    
+
     if (!responseData[urlField]) {
       throw new Error(`Upload URL response missing '${urlField}' field`);
     }
 
     this.logger.info(`Got upload URL from ${url} using ${method}`);
-    
+
     return { upload_url: responseData[urlField] };
   }
 
@@ -276,12 +268,15 @@ export class OutputManager {
 
     const filePath = join(this.outputDir, output.path);
     const dir = dirname(filePath);
-    
-    await mkdir(dir, { recursive: true });
-    
+
+    // Only create directory if it's not the current directory
+    if (dir !== '.' && dir !== this.outputDir) {
+      await mkdir(dir, { recursive: true });
+    }
+
     const content = this.formatData(data, output.format);
     await writeFile(filePath, content);
-    
+
     this.logger.info(`Data saved to file: ${filePath}`);
   }
 
@@ -295,14 +290,14 @@ export class OutputManager {
     switch (format) {
       case 'json':
         return JSON.stringify(data, null, 2);
-      
+
       case 'csv':
         return this.convertToCsv(data);
-      
+
       case 'parquet':
         // Would need a local parquet library
         throw new Error('Parquet format not supported in local-only mode');
-      
+
       default:
         return JSON.stringify(data, null, 2);
     }
@@ -310,7 +305,7 @@ export class OutputManager {
 
   private convertToCsv(data: unknown): string {
     let normalizedData: Record<string, unknown>[];
-    
+
     if (!Array.isArray(data)) {
       normalizedData = [data as Record<string, unknown>];
     } else {
@@ -331,21 +326,21 @@ export class OutputManager {
 
     for (const row of normalizedData) {
       if (!row || typeof row !== 'object') continue;
-      
-      const values = headers.map(header => {
+
+      const values = headers.map((header) => {
         const value = row[header];
         if (value === null || value === undefined) {
           return '';
         }
-        
+
         const stringValue = String(value);
         if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
           return `"${stringValue.replace(/"/g, '""')}"`;
         }
-        
+
         return stringValue;
       });
-      
+
       csvRows.push(values.join(','));
     }
 
@@ -354,10 +349,14 @@ export class OutputManager {
 
   private getContentType(format: 'json' | 'csv' | 'parquet'): string {
     switch (format) {
-      case 'json': return 'application/json';
-      case 'csv': return 'text/csv';
-      case 'parquet': return 'application/octet-stream';
-      default: return 'application/json';
+      case 'json':
+        return 'application/json';
+      case 'csv':
+        return 'text/csv';
+      case 'parquet':
+        return 'application/octet-stream';
+      default:
+        return 'application/json';
     }
   }
 }

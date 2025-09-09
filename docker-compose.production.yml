@@ -1,0 +1,90 @@
+# QueryBird Production Docker Compose
+# Download this file to quickly deploy QueryBird in production
+
+services:
+  querybird:
+    image: ghcr.io/trutohq/querybird:latest
+    container_name: querybird
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      # Production data volumes - customize paths as needed
+      - ./querybird-data/configs:/app/.querybird/configs
+      - ./querybird-data/secrets:/app/.querybird/secrets
+      - ./querybird-data/watermarks:/app/.querybird/watermarks
+      - ./querybird-data/outputs:/app/.querybird/outputs
+      - ./querybird-data/logs:/app/.querybird/logs
+      # Optional: External secrets directory
+      # - /opt/querybird-secrets:/external-secrets
+    networks:
+      - querybird-network
+    healthcheck:
+      test: ["CMD", "bun", "run", "dist/main-runner.js", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Uncomment if you need to expose health check endpoint
+    # ports:
+    #   - "8080:8080"
+
+  # CLI service for running commands in production
+  querybird-cli:
+    image: ghcr.io/trutohq/querybird:latest
+    profiles: ["cli"]
+    environment:
+      - QB_CONFIG_DIR=/app/.querybird
+    volumes:
+      # Same volumes as main service
+      - ./querybird-data/configs:/app/.querybird/configs
+      - ./querybird-data/secrets:/app/.querybird/secrets
+      - ./querybird-data/watermarks:/app/.querybird/watermarks
+      - ./querybird-data/outputs:/app/.querybird/outputs
+      - ./querybird-data/logs:/app/.querybird/logs
+      # Workspace for local files
+      - ./:/workspace
+      # Optional: External secrets directory
+      # - /opt/querybird-secrets:/external-secrets
+    networks:
+      - querybird-network
+    working_dir: /workspace
+    entrypoint: ["bun", "run", "dist/main-runner.js"]
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  querybird-network:
+    driver: bridge
+
+# Production deployment notes:
+#
+# 1. SECURITY:
+#    - Change default PostgreSQL password
+#    - Review volume mount paths
+#    - Configure firewall rules
+#    - Use proper secrets management
+#
+# 2. PERSISTENCE:
+#    - All QueryBird data is stored in ./querybird-data/
+#    - Backup this directory regularly
+#    - Consider using named volumes for better management
+#
+# 3. MONITORING:
+#    - Health checks are configured for both services
+#    - Logs are available in ./querybird-data/logs/
+#    - Use `docker-compose logs -f` to monitor
+#
+# 4. SCALING:
+#    - This is a single-instance deployment
+#    - For high availability, use orchestration platforms like Kubernetes
+#    - Consider load balancers for multiple instances
+#
+# 5. UPDATES:
+#    - Pull latest images: `docker-compose pull`
+#    - Restart services: `docker-compose up -d`
+#    - Data persists across updates
