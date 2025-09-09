@@ -80,7 +80,7 @@ export class ConfigFromSecrets {
       console.log(`✅ Secrets updated with webhook configuration`);
     }
     console.log('\n🏃 You can now run your job with:');
-    console.log(`   querybird run-once --job-id ${jobId}`);
+    console.log(`   docker-compose run --rm querybird-cli run-once --job-id ${jobId}`);
   }
 
   private async collectJobMetadata(jobId: string): Promise<JobMetadata> {

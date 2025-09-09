@@ -48,14 +48,11 @@ class MySqlConnection implements DatabaseConnection {
 export class DatabaseManager {
   private connections = new Map<string, DatabaseConnection>();
 
-  constructor(
-    private secretsManager: ImprovedSecretsManager,
-    private logger: Logger
-  ) {}
+  constructor(private secretsManager: ImprovedSecretsManager, private logger: Logger) {}
 
   async getConnection(type: 'postgres' | 'mysql', connectionInfo: string): Promise<DatabaseConnection> {
     const connectionKey = `${type}:${connectionInfo}`;
-    
+
     let connection = this.connections.get(connectionKey);
     if (connection) {
       return connection;
@@ -63,7 +60,7 @@ export class DatabaseManager {
 
     connection = await this.createConnection(type, connectionInfo);
     this.connections.set(connectionKey, connection);
-    
+
     return connection;
   }
 
@@ -89,7 +86,7 @@ export class DatabaseManager {
 
       await client.connect();
       this.logger.info(`Connected to PostgreSQL: ${config.host}:${config.port}/${config.database}`);
-      
+
       return new PostgresConnection(client);
     } else {
       const mysqlConfig: mysql.ConnectionOptions = {
@@ -99,22 +96,24 @@ export class DatabaseManager {
         user: config.user || config.username,
         password: config.password,
       };
-      
-      if (config.ssl !== false) {
-        mysqlConfig.ssl = {};
+
+      // Set SSL configuration - empty object enables SSL with defaults
+      if (config.ssl === true) {
+        mysqlConfig.ssl = {}; // Enable SSL with default settings
       }
-      
+      // When ssl is false or undefined, we omit the ssl property entirely
+
       const connection = await mysql.createConnection(mysqlConfig);
 
       this.logger.info(`Connected to MySQL: ${config.host}:${config.port}/${config.database}`);
-      
+
       return new MySqlConnection(connection);
     }
   }
 
   private parseConnectionUrl(url: string): DatabaseConfig {
     const urlObj = new URL(url);
-    
+
     return {
       host: urlObj.hostname,
       port: urlObj.port ? parseInt(urlObj.port, 10) : undefined,
@@ -127,18 +126,18 @@ export class DatabaseManager {
 
   async closeAll(): Promise<void> {
     const promises: Promise<void>[] = [];
-    
+
     for (const [key, connection] of this.connections) {
       promises.push(
-        connection.close().catch(error => {
+        connection.close().catch((error) => {
           this.logger.error(`Failed to close connection ${key}:`, error);
         })
       );
     }
-    
+
     await Promise.all(promises);
     this.connections.clear();
-    
+
     this.logger.info('All database connections closed');
   }
 

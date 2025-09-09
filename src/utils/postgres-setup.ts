@@ -61,7 +61,7 @@ export class PostgresSetup {
     console.log(`✅ Config file created: ${join(configDir, jobConfig.id + '.yml')}`);
     console.log(`✅ Secrets file created: secrets/secrets.json`);
     console.log('\n🏃 You can now run your job with:');
-    console.log(`   querybird run-once --job-id ${jobConfig.id}`);
+    console.log(`   docker-compose run --rm querybird-cli run-once --job-id ${jobConfig.id}`);
   }
 
   private async collectJobConfig(): Promise<JobConfig> {
