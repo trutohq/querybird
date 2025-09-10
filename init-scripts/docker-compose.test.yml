@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Primary PostgreSQL database (production-like)
   postgres-primary:
@@ -15,8 +13,6 @@ services:
     volumes:
       - postgres_primary_data:/var/lib/postgresql/data
       - ./init-scripts/init-primary.sql:/docker-entrypoint-initdb.d/01-init-primary.sql
-    networks:
-      - querybird-network
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U admin -d querybird_prod']
       interval: 10s
@@ -37,15 +33,13 @@ services:
     volumes:
       - postgres_staging_data:/var/lib/postgresql/data
       - ./init-scripts/init-staging.sql:/docker-entrypoint-initdb.d/01-init-staging.sql
-    networks:
-      - querybird-network
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U admin -d querybird_staging']
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # MySQL database
+  # MySQL database for testing
   mysql-test:
     image: mysql:8.0
     container_name: querybird-mysql-test
@@ -59,62 +53,15 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-scripts/init-mysql.sql:/docker-entrypoint-initdb.d/01-init-mysql.sql
-    networks:
-      - querybird-network
+    command: --authentication-policy=mysql_native_password --tls-version='' --require_secure_transport=OFF --mysqlx=OFF --pid-file=/var/run/mysqld/mysqld.pid --host-cache-size=0
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'admin', '-padmin_password_123']
       interval: 10s
       timeout: 5s
       retries: 5
-    command: --default-authentication-plugin=mysql_native_password
-
-  # pgAdmin for PostgreSQL management (optional)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: querybird-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@querybird.test
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - '8080:80'
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./init-scripts/pgadmin-servers.json:/pgadmin4/servers.json
-    networks:
-      - querybird-network
-    depends_on:
-      postgres-primary:
-        condition: service_healthy
-      postgres-staging:
-        condition: service_healthy
-
-  # phpMyAdmin for MySQL management (optional)
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    container_name: querybird-phpmyadmin
-    environment:
-      PMA_HOST: mysql-test
-      PMA_PORT: 3306
-      PMA_USER: admin
-      PMA_PASSWORD: admin_password_123
-      MYSQL_ROOT_PASSWORD: root_password_123
-    ports:
-      - '8081:80'
-    networks:
-      - querybird-network
-    depends_on:
-      mysql-test:
-        condition: service_healthy
 
 volumes:
   postgres_primary_data:
   postgres_staging_data:
   mysql_data:
   pgadmin_data:
-
-networks:
-  querybird-network:
-    driver: bridge
-# Create init scripts directory and files
-# These will be created when you run the compose file
