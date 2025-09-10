@@ -7,6 +7,7 @@ import { ImprovedSecretsManager } from '../utils/improved-secrets-manager';
 import { Logger } from '../utils/logger';
 import { DatabaseManager } from './database-manager';
 import { OutputManager } from './output-manager';
+import _ from 'lodash';
 
 export interface JobRunnerOptions {
   configDir: string;
@@ -144,10 +145,16 @@ export class JobRunner {
       const startTime = Date.now();
 
       // Execute input stage
-      const inputData = await this.executeInput(job.input);
+      const inputData = await this.executeInput(job.input, job.id);
 
       // Apply transformation
       const transformedData = await this.applyTransformation(inputData, job.transform);
+
+      // Validate transformed data is not empty
+      if (_.isEmpty(transformedData)) {
+        this.logger.warn(`No valid data after transformation for job ${job.id}; skipping outputs`);
+        throw new Error('No valid data after transformation');
+      }
 
       // Send to outputs
       await this.sendToOutputs(transformedData, job.outputs);
@@ -171,16 +178,16 @@ export class JobRunner {
     return execution;
   }
 
-  private async executeInput(input: Input): Promise<unknown> {
+  private async executeInput(input: Input, jobId: string): Promise<unknown> {
     const results: Record<string, unknown> = {};
 
     if (input.postgres) {
-      const postgresResults = await this.executeDbQuery('postgres', input.postgres);
+      const postgresResults = await this.executeDbQuery('postgres', input.postgres, jobId);
       Object.assign(results, postgresResults);
     }
 
     if (input.mysql) {
-      const mysqlResults = await this.executeDbQuery('mysql', input.mysql);
+      const mysqlResults = await this.executeDbQuery('mysql', input.mysql, jobId);
       Object.assign(results, mysqlResults);
     }
 
@@ -196,7 +203,7 @@ export class JobRunner {
     return results;
   }
 
-  private async executeDbQuery(type: 'postgres' | 'mysql', config: { name: string; connection_info: string; sql: Array<{ name: string; sql: string }> } | Array<{ name: string; connection_info: string; sql: Array<{ name: string; sql: string }> }>): Promise<Record<string, unknown>> {
+  private async executeDbQuery(type: 'postgres' | 'mysql', config: { name: string; connection_info: string; sql: Array<{ name: string; sql: string }> } | Array<{ name: string; connection_info: string; sql: Array<{ name: string; sql: string }> }>, jobId: string): Promise<Record<string, unknown>> {
     const results: Record<string, unknown> = {};
 
     // Handle array of connections
@@ -237,7 +244,7 @@ export class JobRunner {
 
           this.logger.debug(`Successfully completed queries for database: ${dbConfig.name}`);
         } catch (error) {
-          this.logger.error(`Failed to execute queries for database '${dbConfig.name}':`, { error: error instanceof Error ? error.message : String(error) });
+          this.logger.error(`Failed to execute queries for database '${dbConfig.name}' in job '${jobId}':`, { error: error instanceof Error ? error.message : String(error) });
           // Continue with other databases instead of stopping entirely
           results[dbConfig.name] = {
             error: error instanceof Error ? error.message : String(error),

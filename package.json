@@ -1,6 +1,6 @@
 {
   "name": "@trutohq/querybird",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "QueryBird - Containerized job scheduler for database queries with Docker-first deployment",
   "main": "dist/main-runner.js",
   "type": "module",
@@ -60,22 +60,24 @@
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^20.0.0",
-    "@types/pg": "^8.15.5",
-    "@types/yaml": "^1.9.7",
-    "typescript": "^5.0.0"
+    "@types/lodash": "4.17.20",
+    "@types/node": "20.0.0",
+    "@types/pg": "8.15.5",
+    "@types/yaml": "1.9.7",
+    "typescript": "5.9.2"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "5"
   },
   "dependencies": {
-    "commander": "^12.0.0",
-    "croner": "^9.1.0",
     "@truto/truto-jsonata": "1.0.44",
-    "mysql2": "^3.14.3",
-    "pg": "^8.16.3",
-    "yaml": "^2.8.1",
-    "zod": "^3.22.4"
+    "commander": "12.0.0",
+    "croner": "9.1.0",
+    "lodash": "4.17.21",
+    "mysql2": "3.14.3",
+    "pg": "8.16.3",
+    "yaml": "2.8.1",
+    "zod": "3.22.4"
   },
   "engines": {
     "bun": ">=1.0.0"
