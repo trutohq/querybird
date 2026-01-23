@@ -73,7 +73,7 @@
     "@truto/truto-jsonata": "1.0.44",
     "commander": "12.0.0",
     "croner": "9.1.0",
-    "lodash": "4.17.21",
+    "lodash": "4.17.23",
     "mysql2": "3.14.3",
     "pg": "8.16.3",
     "yaml": "2.8.1",
